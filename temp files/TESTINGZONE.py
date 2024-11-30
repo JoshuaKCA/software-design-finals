@@ -60,7 +60,7 @@ class App(customtkinter.CTk):
     
     def create_line_graph(self, parent):
         # Sample data for the line graph
-        x = [0, 1, 2, 3, 4, 5]
+        x = [0, 1, 6, 3, 4, 5]
         y = [0, 1, 4, 9, 16, 25]
         
         # Create a figure and axis

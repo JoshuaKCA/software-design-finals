@@ -391,7 +391,7 @@ class App(customtkinter.CTk):
         self.create_appliance_list(parent)
 
     def create_control_panel(self, parent):
-        """Create the control panel for managing appliances."""
+        """Create the control panel for managing appliances added."""
         # Create a frame for the control panel
         control_frame = customtkinter.CTkFrame(parent   )
         control_frame.pack(fill='x', padx=10, pady=5)

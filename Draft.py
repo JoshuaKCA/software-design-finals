@@ -38,7 +38,7 @@ class App(customtkinter.CTk):
         self.destroy_widgets()
         
         # Widgets for Login
-        self.user = customtkinter.CTkEntry(self, placeholder_text="username", justify="center")
+        self.user = customtkinter.CTkEntry(self, placeholder_text="username", justify="center", height=30, width=100)
         self.user.grid(row=3, column=1, padx=100, pady=2, sticky="ew")
         
         self.password = customtkinter.CTkEntry(self, placeholder_text="password", justify="center", show="*")
