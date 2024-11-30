@@ -21,7 +21,6 @@ class App(customtkinter.CTk):
         self.create_header()
         self.create_sidebar()
         self.create_main_content()
-
         # Create tab buttons and contents
         self.tab_buttons = []
         self.tab_contents = []
@@ -39,11 +38,82 @@ class App(customtkinter.CTk):
 
     def create_header(self):
         """Create the header section."""
-        # Create a frame for the header with specific styling
         self.header = customtkinter.CTkFrame(self, fg_color="#ffffff", height=65, corner_radius=0)
         self.header.grid(row=0, column=0, columnspan=2, sticky="nsew")
-        self.header.grid_propagate(False)  # Prevent the frame from resizing based on its content
+        self.header.grid_propagate(False)
 
+        self.header.grid_rowconfigure(0, weight=1)
+        self.header.grid_columnconfigure(5, weight=1)
+
+        settings_button = customtkinter.CTkButton(
+            self.header, text="Settings", command=self.on_settings_button_click
+        )
+        settings_button.grid(row=0, column=5, padx=10, pady=10, sticky="ne")
+
+    def create_main_content(self):
+        """Create the main content area."""
+        self.main_content = customtkinter.CTkFrame(self, fg_color="#f0f0f0", corner_radius=0)
+        self.main_content.grid(row=1, column=0, columnspan=2, sticky="nsew")
+
+   
+    def on_settings_button_click(self):
+        """Handle the Settings button click."""
+        print("Settings button clicked!")
+        self.create_settings_page()
+
+    def create_settings_page(self):
+        """Create the settings page with energy management functionality."""
+        settings_frame = customtkinter.CTkFrame(self.main_content, corner_radius=0, fg_color="#f0f0f0")
+        settings_frame.grid(row=0, column=0, sticky="nsew")
+
+        settings_frame.grid_rowconfigure(0, weight=1)
+        settings_frame.grid_rowconfigure(1, weight=0)
+        settings_frame.grid_columnconfigure(0, weight=1)
+
+        settings_label = customtkinter.CTkLabel(settings_frame, text="Settings", font=("Arial", 18, "bold"))
+        settings_label.grid(row=0, column=0, padx=20, pady=20, sticky="nw")
+
+        # Energy-saving mode toggle
+        self.energy_mode_var = customtkinter.StringVar(value="Off")
+        energy_mode_label = customtkinter.CTkLabel(settings_frame, text="Energy-saving Mode:")
+        energy_mode_label.grid(row=1, column=0, padx=10, pady=5, sticky="nw")
+        
+        energy_mode_toggle = customtkinter.CTkSwitch(
+            settings_frame, text="Enable Energy Saving", command=self.toggle_energy_mode
+        )
+        energy_mode_toggle.grid(row=1, column=1, padx=10, pady=5, sticky="ne")
+
+        # Brightness slider
+        brightness_label = customtkinter.CTkLabel(settings_frame, text="Adjust Brightness:")
+        brightness_label.grid(row=2, column=0, padx=10, pady=5, sticky="nw")
+
+        self.brightness_slider = customtkinter.CTkSlider(settings_frame, from_=0, to=100, number_of_steps=100)
+        self.brightness_slider.grid(row=2, column=1, padx=10, pady=5, sticky="ne")
+        
+        # Apply settings button
+        settings_button = customtkinter.CTkButton(settings_frame, text="Apply Settings", command=self.apply_settings)
+        settings_button.grid(row=3, column=0, columnspan=2, padx=10, pady=10, sticky="se")
+
+        # Create a grey square in the center
+        grey_square = customtkinter.CTkFrame(settings_frame, width=300, height=300, fg_color="light grey", corner_radius=10)
+        grey_square.grid(row=0, column=0, columnspan=2, padx=50, pady=50, sticky="nsew")
+
+        # Bring the label in front of the grey square
+        settings_label.tkraise()
+
+    def toggle_energy_mode(self):
+        """Toggle the energy-saving mode."""
+        mode = "On" if self.energy_mode_var.get() == "Off" else "Off"
+        self.energy_mode_var.set(mode)
+        print(f"Energy-saving Mode: {mode}")
+
+    def apply_settings(self):
+        """Apply the settings changes."""
+        brightness = self.brightness_slider.get()
+        energy_mode = self.energy_mode_var.get()
+        print(f"Settings applied! Energy-saving Mode: {energy_mode}, Brightness: {brightness}%")
+
+        
     def create_sidebar(self):
         """Create the sidebar with logo and tab buttons."""
         # Create a frame for the sidebar with specific styling
@@ -372,7 +442,6 @@ class App(customtkinter.CTk):
              font=('Arial', 14), wraplength=200, justify='left', text_color='#8e8e8e')
 
         notice_content.grid(row=1, column=1, padx=(5,10), sticky='nw')
-
 
 #APPLIANCE PAGE ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
     def create_appliance_content(self, frame):
