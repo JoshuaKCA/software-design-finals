@@ -76,7 +76,7 @@ class App(customtkinter.CTk):
     def create_tabs(self):
         """Create tab buttons and their corresponding content."""
         # Define tab names with "Dashboard" and "Appliance" as specific tabs
-        tab_names = ["Dashboard", "2", "Appliance", "4"]
+        tab_names = ["Dashboard", "2", "Appliance", "Notifications"]
         for index, name in enumerate(tab_names):
             self.create_tab_button(name, index)
             self.create_tab_content(index)
@@ -99,6 +99,8 @@ class App(customtkinter.CTk):
             self.create_dashboard_content(frame)
         elif index == 2:  # Appliance Page
             self.create_appliance_content(frame)
+        elif index == 3: # Notification Page
+            self.create_notification_tab(frame)
         else:
             # Add a label to the frame for other tabs
             label = customtkinter.CTkLabel(frame, text=f"Content for Tab {index + 1}")
@@ -497,6 +499,43 @@ class App(customtkinter.CTk):
         self.main_content.grid_columnconfigure(0, weight=1)
 
         self.update_idletasks()
+
+#NOTIFICATION PAGE ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+    def create_notification_tab(self, frame):
+        """Create content for the Notification tab."""
+        notification_label = customtkinter.CTkLabel(frame, text="NOTIFICATION", text_color='black', font=('Helvetica', 24))
+        notification_label.pack(padx=20, pady=(15, 0), anchor='nw')
+        
+        notifications_frame = customtkinter.CTkFrame(frame, fg_color="#e0e0e0", width=760, height=540, corner_radius=20)
+        notifications_frame.pack(side='top', anchor='nw', expand=False, padx=70, pady=(15,50))
+        notifications_frame.pack_propagate(False)
+        
+        # Configure grid layout for notifications_frame
+        notifications_frame.grid_columnconfigure((0, 1, 2, 3, 4, 5, 6), weight=1)
+        
+        # Add "Sort by:" label
+        sort_by_label = customtkinter.CTkLabel(notifications_frame, text="Sort by:", text_color='black', font=('Helvetica', 24))
+        sort_by_label.grid(row=0, column=0, padx=(20,0), pady=(20,0), sticky='w')
+        
+        # Add combo box next to the label
+        sort_by_combobox = customtkinter.CTkComboBox(notifications_frame, state="readonly", values=["Latest", "Priority"], font=('Helvetica', 12))
+        sort_by_combobox.grid(row=0, column=1, padx=(0,0), pady=(20,0), sticky='w')
+        
+        # Add another label and combo box on the upper right part of notifications_frame
+        filter_by_label = customtkinter.CTkLabel(notifications_frame, text="Filter by:", text_color='black', font=('Helvetica', 24))
+        filter_by_label.grid(row=0, column=2, padx=(10,0), pady=(20,0), sticky='e')
+        
+        filter_by_combobox = customtkinter.CTkComboBox(notifications_frame, state="readonly", values=["All", "Unread", "Read"], font=('Helvetica', 12))
+        filter_by_combobox.grid(row=0, column=3, padx=(0,20), pady=(20,0), sticky='e')
+        
+        notifications_2frame = customtkinter.CTkScrollableFrame(notifications_frame, fg_color="white", width=760, height=540, corner_radius=15)
+        notifications_2frame.grid(row=1, column=0, columnspan=4, padx=15, pady=(25,15), sticky='nsew')
+
+        # Add hardcoded notifications
+        for i in range(5):
+            notification = customtkinter.CTkLabel(notifications_2frame, text=f"Notification {i+1}", text_color='black', font=('Helvetica', 12))
+            notification.pack(pady=5, anchor='nw')
+        
 
 if __name__ == "__main__":
     app = App()
