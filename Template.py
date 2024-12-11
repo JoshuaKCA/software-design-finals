@@ -41,14 +41,14 @@ class App(customtkinter.CTk):
         """Create the header section."""
         # Create a frame for the header with specific styling
         self.header = customtkinter.CTkFrame(self, fg_color="#ffffff", height=65, corner_radius=0)
-        self.header.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        self.header.grid(row=0, column=1, columnspan=1, sticky="nsew")
         self.header.grid_propagate(False)  # Prevent the frame from resizing based on its content
 
     def create_sidebar(self):
         """Create the sidebar with logo and tab buttons."""
         # Create a frame for the sidebar with specific styling
         self.sidebar = customtkinter.CTkFrame(self, fg_color="black", width=250, corner_radius=0)
-        self.sidebar.grid(row=1, column=0, rowspan=1, sticky="nsew")
+        self.sidebar.grid(row=0, column=0, rowspan=2, sticky="nsew")
         self.sidebar.grid_propagate(False)
         self.sidebar.grid_columnconfigure(0, weight=1)  # Center the buttons
 
@@ -308,7 +308,7 @@ class App(customtkinter.CTk):
         """Create controls for managing appliances."""
         # Create a frame for appliance controls
         appliance_control_frame = customtkinter.CTkFrame(parent, width=300, height=461, fg_color='white', border_width=1, border_color='#b2b2b2', corner_radius=20)
-        appliance_control_frame.pack(side='top', anchor='ne', expand=False, padx=(10,30), pady=(15,0))
+        appliance_control_frame.pack(side='top', anchor='ne', expand=False, padx=20, pady=(15,0))
         appliance_control_frame.pack_propagate(False)
 
         self.create_appliance_controls_content(appliance_control_frame)
