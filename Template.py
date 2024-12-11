@@ -113,8 +113,15 @@ class App(customtkinter.CTk):
         dashboard_label = customtkinter.CTkLabel(frame, text="DASHBOARD", text_color='black', font=('Helvetica', 24))
         dashboard_label.pack(padx=30, pady=(15, 0), anchor='nw')
 
+    # Create a container frame to hold both the line graph and appliance control frames
+        top_frame = customtkinter.CTkFrame(frame, fg_color="transparent")
+        top_frame.pack(side='top', anchor='center', expand=False, padx=30, pady=(15, 0), fill='x')
+
         # Create line graph content
-        self.create_line_graph_frame(frame)
+        self.create_line_graph_frame(top_frame)
+
+        # Create appliance controls beside the line graph
+        self.create_appliance_controls_frame(top_frame)
 
         # Create a container frame to hold both the goal tracker and notification shortcut frames
         bottom_frame = customtkinter.CTkFrame(frame, fg_color="transparent")
@@ -129,7 +136,7 @@ class App(customtkinter.CTk):
         """Create a frame to hold line graphs."""
         # Create a frame for the line graph
         graph_frame = customtkinter.CTkFrame(parent, width=880, height=461, fg_color='white', border_width=1, border_color='#b2b2b2', corner_radius=20)
-        graph_frame.pack(side='top', anchor='nw', expand=False, padx=70, pady=(15,0))
+        graph_frame.pack(side='left', anchor='nw', expand=False, padx=(30,0), pady=(15,0))
         graph_frame.pack_propagate(False)   
 
         # Create button frame for graph selection
@@ -296,6 +303,35 @@ class App(customtkinter.CTk):
         canvas.get_tk_widget().pack(padx=2, pady=2)
         plt.tight_layout()
         plt.close(fig)
+
+    def create_appliance_controls_frame(self, parent):
+        """Create controls for managing appliances."""
+        # Create a frame for appliance controls
+        appliance_control_frame = customtkinter.CTkFrame(parent, width=300, height=461, fg_color='white', border_width=1, border_color='#b2b2b2', corner_radius=20)
+        appliance_control_frame.pack(side='top', anchor='ne', expand=False, padx=(10,30), pady=(15,0))
+        appliance_control_frame.pack_propagate(False)
+
+        self.create_appliance_controls_content(appliance_control_frame)
+
+    def create_appliance_controls_content(self, parent):
+        appliance_running_count = 0
+
+        # Example controls for appliances
+        appliance_label = customtkinter.CTkLabel(parent, text="Running Appliances", font=('Arial', 16, 'bold'), corner_radius=20, text_color='black')
+        appliance_label.pack(side='top', anchor='n',pady=(20, 5), padx=(10, 0))
+
+        if appliance_running_count > 0:
+            # Create a scrollable frame inside the appliance control frame
+            scrollable_frame = customtkinter.CTkScrollableFrame(parent, width=280, height=440)
+            scrollable_frame.pack(expand=True, fill='both', padx=10, pady=10)
+        else:
+            no_appliance_frame = customtkinter.CTkFrame(parent, width=200, height=440, fg_color='#e0e0e0', corner_radius=20)
+            no_appliance_frame.pack(expand=True, fill='both', padx=10, pady=10)
+
+            no_appliances_label = customtkinter.CTkLabel(no_appliance_frame, text="No appliances running", font=('Arial', 16, 'bold'), text_color='#6a6a6a')
+            no_appliances_label.pack(expand=True, fill='y',anchor='center',pady=(20, 5), padx=(10, 0))
+            
+    
 
     def create_goal_tracker_frame(self, parent):
         """Create the goal tracker frame."""
