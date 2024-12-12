@@ -6,15 +6,31 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 from scipy.interpolate import make_interp_spline
 import random
+from datetime import datetime
 
 customtkinter.set_default_color_theme("green")
 
 class Appliance:
-    def __init__(self, name, wattage, unit, state='OFF'):
+    def __init__(self, name, wattage, unit, schedule_start, schedule_end,  state='OFF'):
         self.name = name
-        self.wattage = wattage
-        self.unit = unit
         self.state = state
+        # Convert wattage to watts if the unit is kW
+        if unit == "kW":
+            self.wattage = wattage * 1000
+        else:
+            self.wattage = wattage
+        self.unit = unit
+        self.schedule_start = schedule_start
+        self.schedule_end = schedule_end
+
+    def display_wattage(self):
+        if self.unit == "kW":
+            display_value = self.wattage / 1000
+        else:
+            display_value = self.wattage
+        return f"{display_value}"
+
+
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -22,6 +38,9 @@ class App(customtkinter.CTk):
         self.title("Insert Window title")
         self.state('zoomed')
 
+        """Appliance List"""
+        self.appliances = [] 
+        self.appliance_buttons = {}
         # Configure grid layout for the main window
         self.configure_grid()
 
@@ -317,32 +336,61 @@ class App(customtkinter.CTk):
     def create_appliance_controls_frame(self, parent):
         """Create controls for managing appliances."""
         # Create a frame for appliance controls
-        appliance_control_frame = customtkinter.CTkFrame(parent, width=300, height=461, fg_color='white', border_width=1, border_color='#b2b2b2', corner_radius=20)
-        appliance_control_frame.pack(side='top', anchor='ne', expand=False, padx=20, pady=(15,0))
-        appliance_control_frame.pack_propagate(False)
+        self.appliance_control_frame = customtkinter.CTkFrame(parent, width=300, height=461, fg_color='white', border_width=1, border_color='#b2b2b2', corner_radius=20)
+        self.appliance_control_frame.pack(side='top', anchor='ne', expand=False, padx=20, pady=(15,0))
+        self.appliance_control_frame.pack_propagate(False)
 
-        self.create_appliance_controls_content(appliance_control_frame)
+        self.create_appliance_controls_content(self.appliance_control_frame)
+
+    def count_running_appliances(self):
+        """Count the number of appliances that are currently ON."""
+        count = sum(1 for appliance in self.appliances if appliance.state == 'ON')
+        print(count)
+        return count
 
     def create_appliance_controls_content(self, parent):
-        appliance_running_count = 0
+        for widget in parent.winfo_children():
+            widget.destroy()
+
+        appliance_running_count = self.count_running_appliances()
+        print(f"Appliance running count: {appliance_running_count}")  # Debugging output
 
         # Example controls for appliances
         appliance_label = customtkinter.CTkLabel(parent, text="Running Appliances", font=('Arial', 16, 'bold'), corner_radius=20, text_color='black')
         appliance_label.pack(padx=10, pady=(15, 0), anchor='nw')
 
         if appliance_running_count > 0:
+            print("Appliance running count is greater than 0")  # Debugging output
             # Create a scrollable frame inside the appliance control frame
-            scrollable_frame = customtkinter.CTkScrollableFrame(parent, width=280, height=440)
+            scrollable_frame = customtkinter.CTkScrollableFrame(parent, width=280, height=440, fg_color='#e0e0e0')
             scrollable_frame.pack(expand=True, fill='both', padx=10, pady=10)
+
+            # Add a frame and power button for each running appliance
+            for appliance in self.appliances:
+                if appliance.state == 'ON':
+                    print(f"Adding appliance to scrollable frame: {appliance.name}")  # Debugging output
+                    appliance_frame = customtkinter.CTkFrame(scrollable_frame, fg_color="white", corner_radius=10, border_width=1, border_color="#b2b2b2")
+                    appliance_frame.pack(fill='x', padx=5, pady=5)
+
+                    name_label = customtkinter.CTkLabel(appliance_frame, text=appliance.name, font=('Arial', 14, 'bold'), text_color="black")
+                    name_label.pack(side='left', padx=10, pady=5)
+
+                    power_btn = customtkinter.CTkButton(
+                        appliance_frame,
+                        text="Turn Off",
+                        width=70,
+                        command=lambda a=appliance: self.toggle_appliance(a)
+                    )
+                    power_btn.pack(side='right', padx=10)
         else:
             no_appliance_frame = customtkinter.CTkFrame(parent, width=200, height=440, fg_color='#e0e0e0', corner_radius=20)
             no_appliance_frame.pack(expand=True, fill='both', padx=10, pady=10)
 
             no_appliances_label = customtkinter.CTkLabel(no_appliance_frame, text="No appliances running", font=('Arial', 16, 'bold'), text_color='#6a6a6a')
-            no_appliances_label.pack(expand=True, fill='y',anchor='center',pady=(20, 5), padx=(10, 0))
-            
-    
+            no_appliances_label.pack(expand=True, fill='y', anchor='center', pady=(20, 5), padx=(10, 0))
 
+        
+            
     def create_goal_tracker_frame(self, parent):
         """Create the goal tracker frame."""
         goal_frame = customtkinter.CTkFrame(parent, width=360, height=180, corner_radius=20, fg_color='white', border_width=1, border_color='#b2b2b2',)
@@ -388,7 +436,6 @@ class App(customtkinter.CTk):
 
         tracker_slash_label.grid(row=1, column=1, padx=(0,15), sticky='new')
 
-
     def create_notification_shortcut_frame(self, parent):
         notification_shortcut_frame = customtkinter.CTkFrame(parent, width=350, height=120, corner_radius=20, fg_color='white', border_width=1, border_color='#b2b2b2',)
         notification_shortcut_frame.pack(side='left', anchor='center', expand=False, fill='none', padx=70, pady=15)
@@ -426,15 +473,12 @@ class App(customtkinter.CTk):
         appliance_label = customtkinter.CTkLabel(frame, text="APPLIANCES", text_color='black', font=('Helvetica', 24))
         appliance_label.pack(padx=30, pady=(15,0), anchor='nw')
 
-        top_frame = customtkinter.CTkFrame(frame, fg_color="transparent")
-        top_frame.pack(side='top', anchor='center', padx=30, pady=(15, 0), fill='both', expand=True)
+        top_frame2 = customtkinter.CTkFrame(frame, fg_color="transparent")
+        top_frame2.pack(side='top', anchor='center', padx=30, pady=(15, 0), fill='both', expand=True)
 
-        self.create_appliance_manager_widget(top_frame)
+        self.create_appliance_manager_widget(top_frame2)
 
     def create_appliance_manager_widget(self, parent):
-        #Appliances lists
-        self.appliances = [] 
-
         """Create main card container"""
         appliance_card = customtkinter.CTkFrame(
             parent, 
@@ -473,12 +517,13 @@ class App(customtkinter.CTk):
             height=40, 
             width=400,
             fg_color='#e5e5e5',
-            border_width=0
+            border_width=0,
+            text_color='black'
         )
         search_entry.pack(side='left', padx=5)
         
         # Search button
-        search_btn = customtkinter.CTkButton(search_frame, text="Search", height=40)
+        search_btn = customtkinter.CTkButton(search_frame, text="Search", height=40, command=lambda: self.search_appliances(search_entry.get()))
         search_btn.pack(side='left')
         
         # Sort button
@@ -488,7 +533,8 @@ class App(customtkinter.CTk):
             control_frame, 
             values=sort_options, 
             variable=sort_var, 
-            height=40
+            height=40,
+            command=self.sort_appliances
         )
         sort_menu.pack(side='right', padx=0)
 
@@ -523,19 +569,21 @@ class App(customtkinter.CTk):
         wattage_entry = customtkinter.CTkEntry(wattage_frame, placeholder_text="Wattage")
         wattage_entry.pack(side='left', padx=5)
 
-        units = ["W", "kW", "mW"]
+        units = ["W", "kW"]
         unit_var = customtkinter.StringVar(value="W")
         unit_menu = customtkinter.CTkOptionMenu(wattage_frame, values=units, variable=unit_var)
         unit_menu.pack(side='left')
 
         def save_appliance():
             appliance_name = name_entry.get()
-            wattage = wattage_entry.get()
+            wattage = float(wattage_entry.get())
             unit = unit_var.get()
-           
+            schedule_start = None
+            schedule_end = None
+
             if appliance_name and wattage:
                 # Create an Appliance object
-                new_appliance = Appliance(appliance_name, wattage, unit)
+                new_appliance = Appliance(appliance_name, wattage, unit, schedule_start, schedule_end)
                 
                 # Add to appliance list
                 self.appliances.append(new_appliance)
@@ -550,14 +598,20 @@ class App(customtkinter.CTk):
         save_btn = customtkinter.CTkButton(dialog, text="Save Appliance", command=save_appliance)
         save_btn.pack(pady=20)
 
-    def refresh_appliance_list(self):
-        """Refresh the appliance list display"""
-        # Clear existing items
+    def search_appliances(self, search_term):
+        """Search appliances by name"""
+        # Clear existing items in list frame
         for widget in self.list_frame.winfo_children():
             widget.destroy()
 
-        # Create item frame for each appliance
-        for appliance in self.appliances:
+        # Filter appliances based on search term
+        filtered_appliances = [
+            appliance for appliance in self.appliances 
+            if search_term.lower() in appliance.name.lower()
+        ]
+
+        # Display filtered appliances
+        for appliance in filtered_appliances:
             item_frame = customtkinter.CTkFrame(
                 self.list_frame,
                 fg_color="white",
@@ -567,10 +621,10 @@ class App(customtkinter.CTk):
             )
             item_frame.pack(fill='x', padx=10, pady=5)
 
-            # Appliance name and details
+            # Appliance name and detail
             name_label = customtkinter.CTkLabel(
                 item_frame, 
-                text=f"{appliance.name} - {appliance.wattage}{appliance.unit}", 
+                text=f"{appliance.name} - {appliance.display_wattage()}{appliance.unit}", 
                 font=('Arial', 14, 'bold'),
                 text_color="black"
             )
@@ -587,7 +641,8 @@ class App(customtkinter.CTk):
                 width=70,
                 command=lambda a=appliance: self.toggle_appliance(a)
             )
-            power_btn.pack(side='right', padx=5)   
+            power_btn.pack(side='right', padx=5)
+            self.appliance_buttons[appliance.name] = power_btn
 
             # Edit button
             edit_btn = customtkinter.CTkButton(
@@ -607,22 +662,252 @@ class App(customtkinter.CTk):
             )
             delete_btn.pack(side='right', padx=5)
 
-    def toggle_appliance(self, appliance):
-        """Toggle appliance power state."""
-        # Toggle the appliance state
-        appliance.state = 'ON' if appliance.state == 'OFF' else 'OFF'
+   
+    def refresh_appliance_list(self):
+        """Refresh the appliance list display"""
+        # Clear existing items
+        for widget in self.list_frame.winfo_children():
+            widget.destroy()
 
-        # Update the button text
-        self.update_power_button(appliance)
+        # Create item frame for each appliance
+        for appliance in self.appliances:
+            item_frame = customtkinter.CTkFrame(
+                self.list_frame,
+                fg_color="white",
+                corner_radius=10,
+                border_width=1,
+                border_color="#b2b2b2"
+            )
+            item_frame.pack(fill='x', padx=10, pady=5)
+
+            # Appliance name and detail
+            name_label = customtkinter.CTkLabel(
+                item_frame, 
+                text=f"{appliance.name} - {appliance.display_wattage()}{appliance.unit}", 
+                font=('Arial', 14, 'bold'),
+                text_color="black"
+            )
+            name_label.pack(side='left', padx=15, pady=10)
+
+            # Control buttons frame
+            btn_frame = customtkinter.CTkFrame(item_frame, fg_color="transparent")
+            btn_frame.pack(side='right', padx=10)
+
+            # Schedule button
+            schedule_btn = customtkinter.CTkButton(
+                btn_frame,
+                text="Schedule",
+                width=70,
+                command=lambda a=appliance: self.create_schedule_dialog(a)
+            )
+            schedule_btn.pack(side='right', padx=5)
+
+            # Power button
+            power_btn = customtkinter.CTkButton(
+                btn_frame,
+                text=appliance.state,
+                width=70,
+                command=lambda a=appliance: self.toggle_appliance(a)
+            )
+            power_btn.pack(side='right', padx=5) 
+            self.appliance_buttons[appliance.name] = power_btn  # Store button reference (toggle On and Off)
+
+            # Edit button
+            edit_btn = customtkinter.CTkButton(
+                btn_frame,
+                text="Edit",
+                width=70,
+                command=lambda a=appliance: self.edit_appliance(a)
+            )
+            edit_btn.pack(side='right', padx=5)
+
+            # Delete button
+            delete_btn = customtkinter.CTkButton(
+                btn_frame,
+                text="Delete",
+                width=70,
+                command=lambda a=appliance: self.delete_appliance(a)
+            )
+            delete_btn.pack(side='right', padx=5)
+    
+    def sort_appliances(self, criterion):
+        """Sort appliances based on the selected criterion."""
+        if criterion == "Wattage":
+            self.appliances.sort(key=lambda a: a.wattage, reverse=True)
+        elif criterion == "State (On/Off)":
+            self.appliances.sort(key=lambda a: a.state, reverse=True)
+        elif criterion == "Alphabetical":
+            self.appliances.sort(key=lambda a: a.name.lower())
+
+        # Refresh the appliance list to reflect the new order
         self.refresh_appliance_list()
 
-    def update_power_button(self, appliance):
-        """Update the power button text to reflect the appliance state."""
-        power_button = self.appliance_buttons.get(appliance.name)
-        if power_button:
-            power_button.configure(text=appliance.state)
+    def toggle_appliance(self, appliance):
+        appliance.state = 'ON' if appliance.state == 'OFF' else 'OFF'
+        if appliance.name in self.appliance_buttons:
+            self.appliance_buttons[appliance.name].configure(text=appliance.state)
+        running_count = self.count_running_appliances()
+        print(f"Total running appliances: {running_count}")
+        self.create_appliance_controls_content(self.appliance_control_frame)
+        self.update_idletasks()
     
+    def delete_appliance(self, appliance):
+        """Open a confirmation dialog to delete the selected appliance."""
+        # Create a dialog window for confirmation
+        dialog = customtkinter.CTkToplevel(self)
+        dialog.title("Confirm Deletion")
+        dialog.geometry("300x150")
 
+        dialog.transient(self)
+        dialog.focus_set()
+        dialog.grab_set()
+        dialog.lift()
+
+        # Confirmation message
+        message_label = customtkinter.CTkLabel(dialog, text=f"Are you sure you want to delete '{appliance.name}'?", wraplength=250, justify='center')
+        message_label.pack(pady=20)
+
+        # Button frame
+        button_frame = customtkinter.CTkFrame(dialog, fg_color='transparent')
+        button_frame.pack(pady=10)
+
+        def confirm_delete():
+            # Remove the appliance from the list
+            if appliance in self.appliances:
+                self.appliances.remove(appliance)
+                self.refresh_appliance_list()
+                self.create_appliance_controls_content(self.appliance_control_frame)
+            dialog.destroy()
+
+        def cancel_delete():
+            dialog.destroy()
+
+        # Confirm button
+        confirm_btn = customtkinter.CTkButton(button_frame, text="Yes", command=confirm_delete)
+        confirm_btn.pack(side='left', padx=10)
+
+        # Cancel button
+        cancel_btn = customtkinter.CTkButton(button_frame, text="No", command=cancel_delete)
+        cancel_btn.pack(side='right', padx=10)
+
+    def edit_appliance(self, appliance):
+        """Open a dialog to edit the selected appliance."""
+        # Create a dialog window for editing appliances
+        dialog = customtkinter.CTkToplevel(self)
+        dialog.title("Edit Appliance")
+        dialog.geometry("400x300")
+
+        dialog.transient(self)
+        dialog.focus_set()
+        dialog.grab_set()
+        dialog.lift()
+
+        # Name Entry
+        name_label = customtkinter.CTkLabel(dialog, text="Appliance Name:")
+        name_label.pack(pady=5)
+        name_entry = customtkinter.CTkEntry(dialog)
+        name_entry.insert(0, appliance.name)
+        name_entry.pack(pady=5)
+
+        # Wattage Frame
+        wattage_frame = customtkinter.CTkFrame(dialog)
+        wattage_frame.pack(pady=10)
+        
+        # Wattage textbox
+        wattage_entry = customtkinter.CTkEntry(wattage_frame, placeholder_text="Wattage")
+        wattage_entry.insert(0, str(appliance.wattage))
+        wattage_entry.pack(side='left', padx=5)
+
+        units = ["W", "kW"]
+        unit_var = customtkinter.StringVar(value=appliance.unit)
+        unit_menu = customtkinter.CTkOptionMenu(wattage_frame, values=units, variable=unit_var)
+        unit_menu.pack(side='left')
+
+        def save_changes():
+            appliance.name = name_entry.get()
+            new_wattage = float(wattage_entry.get())
+            new_unit = unit_var.get()
+
+            if new_unit == "kW":
+                appliance.wattage = new_wattage * 1000
+            else:
+                appliance.wattage = new_wattage
+
+            appliance.unit = unit_var.get()
+            self.refresh_appliance_list()
+            self.create_appliance_controls_content(self.appliance_control_frame)
+            dialog.destroy()
+
+        # Save Button
+        save_btn = customtkinter.CTkButton(dialog, text="Save Changes", command=save_changes)
+        save_btn.pack(pady=20)
+
+    def create_schedule_dialog(self, appliance):
+        dialog = customtkinter.CTkToplevel(self)
+        dialog.title(f"Schedule {appliance.name}")
+        dialog.geometry("300x300")
+
+        dialog.transient(self)
+        dialog.focus_set()
+        dialog.grab_set()
+        dialog.lift()
+  
+        schedule_frame = customtkinter.CTkFrame(dialog)
+        schedule_frame.pack(pady=20)
+        
+        start_label = customtkinter.CTkLabel(schedule_frame, text="Start Time (HH:MM)")
+        start_label.pack()
+        start_time = customtkinter.CTkEntry(schedule_frame, placeholder_text="08:00", text_color='black')
+        start_time.pack(pady=5)
+        
+        end_label = customtkinter.CTkLabel(schedule_frame, text="End Time (HH:MM)")
+        end_label.pack()
+        end_time = customtkinter.CTkEntry(schedule_frame, placeholder_text="17:00", text_color='black')
+        end_time.pack(pady=5)
+        
+        def save_schedule():
+            appliance.schedule_start = start_time.get()
+            appliance.schedule_end = end_time.get()
+            self.start_schedule_checker()
+            dialog.destroy()
+    
+        save_btn = customtkinter.CTkButton(dialog, text="Save Schedule", command=save_schedule)
+        save_btn.pack(pady=20)
+
+    def start_schedule_checker(self):
+        def check_schedules():
+            current_time = datetime.now().time()
+            
+            for appliance in self.appliances:
+                if appliance.schedule_start and appliance.schedule_end:  # Check if schedule exists
+                    print(f"Checking appliance: {appliance.name}")
+                    print(f"Schedule Start: {appliance.schedule_start}, Schedule End: {appliance.schedule_end}")
+                    start_time = datetime.strptime(appliance.schedule_start, "%H:%M").time()
+                    end_time = datetime.strptime(appliance.schedule_end, "%H:%M").time()
+                    if start_time <= current_time <= end_time:
+                        if appliance.state != 'ON':
+                            appliance.state = 'ON'
+                            if appliance.name in self.appliance_buttons:
+                                self.appliance_buttons[appliance.name].configure(text='ON')
+                            self.refresh_appliance_list()
+                            self.create_appliance_controls_content(self.appliance_control_frame)
+                    else:
+                        if appliance.state != 'OFF':
+                            appliance.state = 'OFF'
+                            if appliance.name in self.appliance_buttons:
+                                self.appliance_buttons[appliance.name].configure(text='OFF')
+                            self.refresh_appliance_list()
+                            self.create_appliance_controls_content(self.appliance_control_frame)
+            
+            self.after(60000, check_schedules)  # Check every minute
+        
+        check_schedules()
+
+
+    def clear_schedule(self, appliance):
+        appliance.schedule_start = None
+        appliance.schedule_end = None
+        
 #NOTIFICATION PAGE ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
     def create_notification_tab(self, frame):
         """Create content for the Notification tab."""
