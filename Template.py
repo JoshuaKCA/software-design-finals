@@ -7,8 +7,13 @@ import numpy as np
 from scipy.interpolate import make_interp_spline
 import random
 from datetime import datetime
+
+import time
+import matplotlib.dates as mdates
+
 import subprocess
 import tkinter.messagebox
+
 
 
 customtkinter.set_default_color_theme("green")
@@ -33,8 +38,6 @@ class Appliance:
             display_value = self.wattage
         return f"{display_value}"
 
-
-
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
@@ -46,8 +49,18 @@ class App(customtkinter.CTk):
         self.state('zoomed')
 
         """Appliance List"""
-        self.appliances = [] 
+        self.appliances = []
         self.appliance_buttons = {}
+
+        self.accumulated_wattage = 0
+        self.start_time = time.time()
+        
+        # Initialize data for plotting
+        self.x_data = []
+        self.y_data = []
+        self.daily_wattage = [0] * 31
+        self.monthly_wattage = [0] * 12
+        
         # Configure grid layout for the main window
         self.configure_grid()
 
@@ -247,46 +260,83 @@ class App(customtkinter.CTk):
             graph1_btn.pack(side='left',  fill='y')
             graph2_btn.pack(side='left',  fill='y')
             graph3_btn.pack(side='left',  fill='y')
+    
+    def calculate_accumulated_wattage(self):
+        """Calculate the accumulated wattage based on running appliances."""
+        current_time = time.time()
+        elapsed_time = current_time - self.start_time  # Time in seconds
+        self.start_time = current_time
+
+        # Calculate the wattage consumed in the elapsed time
+        for appliance in self.appliances:
+            if appliance.state == 'ON':
+                self.accumulated_wattage += (appliance.wattage / 3600) * elapsed_time  # Convert wattage to watt-hours
+        # Update daily wattage
+        current_day = datetime.now().day - 1  
+        self.daily_wattage[current_day] += self.accumulated_wattage
+
+        # Update monthly wattage
+        current_month = datetime.now().month - 1  # Get the current month (0-indexed)
+        self.monthly_wattage[current_month] += self.accumulated_wattage
+
+        return self.accumulated_wattage
+    
+    def calculate_total_wattage(self):
+        """Calculate the total wattage based on running appliances."""
+        total_wattage = 0
+        current_time = time.time()
+        elapsed_time = current_time - self.start_time  # Time in seconds
+
+        # Calculate the total wattage of running appliances
+        for appliance in self.appliances:
+            if appliance.state == 'ON':
+                total_wattage += (appliance.wattage / 3600) * elapsed_time  # Sum up the wattage of all running appliances
+
+        return total_wattage
+
+    def update_total_wattage(self):
+        """Update the total wattage every second."""
+        if not self.winfo_exists():
+            return  # Exit if the window has been destroyed
+
+        current_time = datetime.now()
+        self.x_data.append(current_time)
+        self.y_data.append(self.calculate_total_wattage())
+
+        self.after(1000, self.update_total_wattage)  # Update every second
 
     def create_line_graph(self, parent):
-        """Create a sinusoidal wattage line graph."""
-        # Generate sample data for wattage (simulated data for demonstration)
-        hours = np.array([hour for hour in range(24)])
-        wattage = np.array([np.sin(hour / 3.0) + random.uniform(-0.1, 0.1) for hour in hours])  # Simulated sinusoidal data
+        """Create a real-time wattage line graph."""
+        self.fig, self.ax = plt.subplots(figsize=(10, 4))
+        self.canvas = FigureCanvasTkAgg(self.fig, master=parent)
+        self.canvas.get_tk_widget().pack(padx=2, pady=2)
 
-        # Create a smooth curve using spline interpolation
-        x_smooth = np.linspace(hours.min(), hours.max(), 300)  # More points for a smoother curve
-        spl = make_interp_spline(hours, wattage, k=3)  # Cubic spline
-        wattage_smooth = spl(x_smooth)
+        self.ax.set_ylabel("Power (kW)")
+        self.ax.legend(["Wattage"], loc="upper right")
+        self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
 
-        # Create a matplotlib figure and axis
-        fig, ax = plt.subplots(figsize=(10, 4))
-        ax.plot(x_smooth, wattage_smooth, label="Wattage", color="orange", linewidth=2)
-        ax.fill_between(x_smooth, wattage_smooth, color="orange", alpha=0.3)  # Filled area under the curve
-        ax.axhline(0, color="gray", linewidth=0.5)  # Zero line
+        self.line, = self.ax.plot(self.x_data, self.y_data, label="Wattage", color="orange", linewidth=2)
 
-        ax.spines['top'].set_visible(False)  # Remove the top border
-        ax.spines['right'].set_visible(False)
+        self.update_line_graph()
 
-        ax.set_xlim(x_smooth[0], x_smooth[-1]) 
+    def update_line_graph(self):
+        """Update the line graph with new data."""
+        if not self.winfo_exists():
+            return  # Exit if the window has been destroyed
 
-        # Set labels and title
-        ax.set_ylabel("Power (kW)")
-        ax.set_ylim(0, 1.5)  # Set the y-axis limits to match the example
-        ax.legend(["Wattage"], loc="upper right")
+        current_time = datetime.now()
+        self.x_data.append(current_time)
+        self.y_data.append(self.calculate_total_wattage())
 
-        # Customize the x-axis ticks
-        ax.set_xticks(hours)
-        ax.set_xticklabels([f"{hour:02d}:00" for hour in hours], rotation=45)
+        self.line.set_data(self.x_data, self.y_data)
 
-        # Embed the plot in the Tkinter application
-        canvas = FigureCanvasTkAgg(fig, master=parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(padx=2, pady=2)
+        # Make the y-axis dynamic
+        self.ax.relim()
+        self.ax.autoscale_view()
 
-        plt.tight_layout()
-        plt.close(fig)
+        self.canvas.draw()
 
+        self.after(1000, self.update_line_graph)  # Update every second
     def switch_graph(self, graph_index, parent):
         """Switch between different graphs."""
         # Clear existing graph widgets
@@ -304,49 +354,48 @@ class App(customtkinter.CTk):
 
     def create_bar_graph_for_month(self, parent):
         """Create a bar graph for the month."""
+        current_month = datetime.now().strftime("%B")
+        current_year = datetime.now().year
         # Define data for the bar graph
         x = list(range(1, 32))
-        y = [23, 45, 56, 78, 43] + [0] * 26
+        y = self.daily_wattage
 
         # Create a matplotlib figure and axis
         fig, ax = plt.subplots(figsize=(10, 4))
         ax.bar(x, y)
 
         # Set labels and title
-        ax.set_xlabel('Categories')
-        ax.set_ylabel('Values')
-        ax.set_title('Sample Bar Graph')
+        ax.set_xlabel('Day of the Month')
+        ax.set_ylabel('Accumulated Wattage (kWh)')
+        ax.set_title(f'Daily Accumulated Wattage for {current_month} {current_year}')
         ax.tick_params(labelsize=8)
 
-        # Embed the plot in the Tkinter application
-        canvas = FigureCanvasTkAgg(fig, master=parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(padx=2, pady=2)
-        plt.tight_layout()
-        plt.close(fig)
+        # Display the graph in the Tkinter window
+        self.canvas = FigureCanvasTkAgg(fig, master=parent)
+        self.canvas.get_tk_widget().pack(padx=2, pady=2)     
 
     def create_bar_graph_for_year(self, parent):
         """Create a bar graph for the year."""
         # Define data for the bar graph
         x = list(range(1, 13))
-        y = [2, 5, 3, 8, 6, 7, 1, 4, 9, 5, 0, 0]
+        y = self.monthly_wattage
+
+        # Get the current year
+        current_year = datetime.now().year
 
         # Create a matplotlib figure and axis
         fig, ax = plt.subplots(figsize=(10, 4))
         ax.bar(x, y)
 
         # Set labels and title
-        ax.set_xlabel('Categories')
-        ax.set_ylabel('Values')
-        ax.set_title('Sample Bar Graph')
+        ax.set_xlabel('Month')
+        ax.set_ylabel('Accumulated Wattage (kWh)')
+        ax.set_title(f'Monthly Accumulated Wattage for {current_year}')
         ax.tick_params(labelsize=8)
 
-        # Embed the plot in the Tkinter application
-        canvas = FigureCanvasTkAgg(fig, master=parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(padx=2, pady=2)
-        plt.tight_layout()
-        plt.close(fig)
+        # Display the graph in the Tkinter window
+        self.canvas = FigureCanvasTkAgg(fig, master=parent)
+        self.canvas.get_tk_widget().pack(padx=2, pady=2)
 
     def create_appliance_controls_frame(self, parent):
         """Create controls for managing appliances."""
@@ -422,7 +471,7 @@ class App(customtkinter.CTk):
 
         # Debugging: Print the actual size after layout
         self.after(100, lambda: print("Notification Frame Size:", goal_frame.winfo_width(), goal_frame.winfo_height()))
-
+    
     def create_goal_tracker_content(self, frame):
         """Create content for the goal tracker frame."""
         accumulated_consumption = 120.50
@@ -438,18 +487,28 @@ class App(customtkinter.CTk):
             justify='center', 
             text_color="black"
         )
-
         goal_tracker_label.grid(row=0, column=1, padx=(0,15), pady=(5,0), sticky='sew')
 
-        tracker_slash_label = customtkinter.CTkLabel(frame, 
-            text=f"P {accumulated_consumption} / P {set_goal}", 
+        self.tracker_slash_label = customtkinter.CTkLabel(frame, 
+            text="Accumulated Wattage: 0 kWh", 
             font=('Arial', 20, 'bold'), 
             wraplength=200, 
             justify='center', 
             text_color='#8e8e8e'
         )
+        self.tracker_slash_label.grid(row=1, column=1, padx=(0,15), sticky='new')
+        self.update_accumulated_wattage_label()
 
-        tracker_slash_label.grid(row=1, column=1, padx=(0,15), sticky='new')
+    def update_accumulated_wattage_label(self):
+        """Update the accumulated wattage label every second."""
+        if not self.winfo_exists():
+            return  # Exit if the window has been destroyed
+
+        accumulated_wattage = self.calculate_accumulated_wattage()
+        print(accumulated_wattage)
+        self.tracker_slash_label.configure(text=f"Accumulated Wattage: {accumulated_wattage:.2f} kWh")
+
+        self.after(1000, self.update_accumulated_wattage_label)  # Update every second
 
     def create_notification_shortcut_frame(self, parent):
         notification_shortcut_frame = customtkinter.CTkFrame(parent, width=350, height=120, corner_radius=20, fg_color='white', border_width=1, border_color='#b2b2b2',)
