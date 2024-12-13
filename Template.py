@@ -8,6 +8,8 @@ from scipy.interpolate import make_interp_spline
 import random
 from datetime import datetime
 import subprocess
+import tkinter.messagebox
+
 
 customtkinter.set_default_color_theme("green")
 
@@ -952,6 +954,135 @@ class App(customtkinter.CTk):
         notifications_2frame = customtkinter.CTkScrollableFrame(notifications_frame, fg_color="white", width=760, height=540, corner_radius=15)
         notifications_2frame.grid(row=1, column=0, columnspan=4, padx=15, pady=(25,15), sticky='nsew')
 
+        # Wattage Frame
+        wattage_frame = customtkinter.CTkFrame(dialog)
+        wattage_frame.pack(pady=10)
+        
+        # Wattage textbox
+        wattage_entry = customtkinter.CTkEntry(wattage_frame, placeholder_text="Wattage")
+        wattage_entry.insert(0, str(appliance.wattage))
+        wattage_entry.pack(side='left', padx=5)
+
+        units = ["W", "kW"]
+        unit_var = customtkinter.StringVar(value=appliance.unit)
+        unit_menu = customtkinter.CTkOptionMenu(wattage_frame, values=units, variable=unit_var)
+        unit_menu.pack(side='left')
+
+        def save_changes():
+            appliance.name = name_entry.get()
+            new_wattage = float(wattage_entry.get())
+            new_unit = unit_var.get()
+
+            if new_unit == "kW":
+                appliance.wattage = new_wattage * 1000
+            else:
+                appliance.wattage = new_wattage
+
+            appliance.unit = unit_var.get()
+            self.refresh_appliance_list()
+            self.create_appliance_controls_content(self.appliance_control_frame)
+            dialog.destroy()
+
+        # Save Button
+        save_btn = customtkinter.CTkButton(dialog, text="Save Changes", command=save_changes)
+        save_btn.pack(pady=20)
+
+    def create_schedule_dialog(self, appliance):
+        dialog = customtkinter.CTkToplevel(self)
+        dialog.title(f"Schedule {appliance.name}")
+        dialog.geometry("300x300")
+
+        dialog.transient(self)
+        dialog.focus_set()
+        dialog.grab_set()
+        dialog.lift()
+  
+        schedule_frame = customtkinter.CTkFrame(dialog)
+        schedule_frame.pack(pady=20)
+        
+        start_label = customtkinter.CTkLabel(schedule_frame, text="Start Time (HH:MM)")
+        start_label.pack()
+        start_time = customtkinter.CTkEntry(schedule_frame, placeholder_text="08:00", text_color='black')
+        start_time.pack(pady=5)
+        
+        end_label = customtkinter.CTkLabel(schedule_frame, text="End Time (HH:MM)")
+        end_label.pack()
+        end_time = customtkinter.CTkEntry(schedule_frame, placeholder_text="17:00", text_color='black')
+        end_time.pack(pady=5)
+        
+        def save_schedule():
+            appliance.schedule_start = start_time.get()
+            appliance.schedule_end = end_time.get()
+            self.start_schedule_checker()
+            dialog.destroy()
+    
+        save_btn = customtkinter.CTkButton(dialog, text="Save Schedule", command=save_schedule)
+        save_btn.pack(pady=20)
+
+    def start_schedule_checker(self):
+        def check_schedules():
+            current_time = datetime.now().time()
+            
+            for appliance in self.appliances:
+                if appliance.schedule_start and appliance.schedule_end:  # Check if schedule exists
+                    print(f"Checking appliance: {appliance.name}")
+                    print(f"Schedule Start: {appliance.schedule_start}, Schedule End: {appliance.schedule_end}")
+                    start_time = datetime.strptime(appliance.schedule_start, "%H:%M").time()
+                    end_time = datetime.strptime(appliance.schedule_end, "%H:%M").time()
+                    if start_time <= current_time <= end_time:
+                        if appliance.state != 'ON':
+                            appliance.state = 'ON'
+                            if appliance.name in self.appliance_buttons:
+                                self.appliance_buttons[appliance.name].configure(text='ON')
+                            self.refresh_appliance_list()
+                            self.create_appliance_controls_content(self.appliance_control_frame)
+                    else:
+                        if appliance.state != 'OFF':
+                            appliance.state = 'OFF'
+                            if appliance.name in self.appliance_buttons:
+                                self.appliance_buttons[appliance.name].configure(text='OFF')
+                            self.refresh_appliance_list()
+                            self.create_appliance_controls_content(self.appliance_control_frame)
+            
+            self.after(60000, check_schedules)  # Check every minute
+        
+        check_schedules()
+
+
+    def clear_schedule(self, appliance):
+        appliance.schedule_start = None
+        appliance.schedule_end = None
+        
+#NOTIFICATION PAGE ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+    def create_notification_tab(self, frame):
+        """Create content for the Notification tab."""
+        notification_label = customtkinter.CTkLabel(frame, text="NOTIFICATION", text_color='black', font=('Helvetica', 24))
+        notification_label.pack(padx=20, pady=(15, 0), anchor='nw')
+        
+        notifications_frame = customtkinter.CTkFrame(frame, fg_color="#e0e0e0", width=760, height=540, corner_radius=20)
+        notifications_frame.pack(side='top', anchor='nw', expand=False, padx=70, pady=(15,50))
+        notifications_frame.pack_propagate(False)
+        
+        # Configure grid layout for notifications_frame
+        notifications_frame.grid_columnconfigure((0, 1, 2, 3, 4, 5, 6), weight=1)
+        
+        # Add "Sort by:" label
+        sort_by_label = customtkinter.CTkLabel(notifications_frame, text="Sort by:", text_color='black', font=('Helvetica', 24))
+        sort_by_label.grid(row=0, column=0, padx=(20,0), pady=(20,0), sticky='w')
+        
+        # Add combo box next to the label
+        sort_by_combobox = customtkinter.CTkComboBox(notifications_frame, state="readonly", values=["Latest", "Priority"], font=('Helvetica', 12))
+        sort_by_combobox.grid(row=0, column=1, padx=(0,0), pady=(20,0), sticky='w')
+        
+        # Add another label and combo box on the upper right part of notifications_frame
+        filter_by_label = customtkinter.CTkLabel(notifications_frame, text="Filter by:", text_color='black', font=('Helvetica', 24))
+        filter_by_label.grid(row=0, column=2, padx=(10,0), pady=(20,0), sticky='e')
+        
+        filter_by_combobox = customtkinter.CTkComboBox(notifications_frame, state="readonly", values=["All", "Unread", "Read"], font=('Helvetica', 12))
+        filter_by_combobox.grid(row=0, column=3, padx=(0,20), pady=(20,0), sticky='e')
+        
+        notifications_2frame = customtkinter.CTkScrollableFrame(notifications_frame, fg_color="white", width=760, height=540, corner_radius=15)
+        notifications_2frame.grid(row=1, column=0, columnspan=4, padx=15, pady=(25,15), sticky='nsew')
         # Add hardcoded notifications
         for i in range(5):
             notification = customtkinter.CTkLabel(notifications_2frame, text=f"Notification {i+1}", text_color='black', font=('Helvetica', 12))
@@ -975,7 +1106,202 @@ class App(customtkinter.CTk):
     
 #SETTINGS PAGE -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     def create_settings_tab(self, frame):
+        settings_label = customtkinter.CTkLabel(frame, text="SETTINGS", text_color='black', font=('Helvetica', 24))
+        settings_label.pack(padx=20, pady=(15, 0), anchor='nw')
 
+        """Create main card container"""
+        settings_card = customtkinter.CTkFrame(
+            frame,
+            fg_color="white",
+            corner_radius=20,
+            border_width=1,
+            border_color='#b2b2b2'
+        )
+
+        settings_card.pack(fill='both', expand=True, padx=30, pady=15)
+
+        """Create content frame inside card - houses the control panel and appliance list"""
+        content_frame = customtkinter.CTkFrame(settings_card, fg_color='transparent')
+        content_frame.pack(fill='both', expand=True, padx=20, pady=20)
+
+        # Create a frame to hold the inner frame and the buttons (for centering)
+        parent_frame = customtkinter.CTkFrame(
+            content_frame,
+            fg_color='transparent',
+            width=600,  # Set the width of the parent frame
+            height=400,  # Set the height of the parent frame
+        )
+        parent_frame.pack(side='top', anchor='center', expand=True)  # Center the parent frame in content_frame
+
+        # Create a frame to hold the buttons on the right side
+        button_frame = customtkinter.CTkFrame(
+            parent_frame,
+            fg_color='transparent',  # Make the frame background invisible
+            width=200,
+            height=400  # Height to space out the buttons
+        )
+        button_frame.pack(side='right', anchor='center', padx=10, pady=10)  # Position buttons on the right
+
+        # Add rectangle buttons stacked on top of each other in the button frame
+        change_password_button = customtkinter.CTkButton(
+            button_frame,
+            text="Change Password",
+            width=200,
+            height=50,
+            corner_radius=10
+        )
+        change_password_button.pack(pady=(10, 5))  # Spacing between buttons
+
+        # Function to show custom dialog
+        def show_privacy_policy_custom():
+            # Create a new top-level window
+            dialog = customtkinter.CTkToplevel()
+            dialog.title("Privacy Policy")
+            dialog.geometry("400x200")  # Set the size of the dialog
+            dialog.transient(self)
+            dialog.focus_set()
+            dialog.grab_set()
+            dialog.lift()
+            
+            # Add a label to the dialog
+            label = customtkinter.CTkLabel(dialog, text="Here is the Privacy Policy details...", font=("Helvetica", 16))
+            label.pack(padx=20, pady=20)
+
+            # Add a button to close the dialog
+            close_button = customtkinter.CTkButton(dialog, text="Close", command=dialog.destroy)
+            close_button.pack(pady=10)
+
+        # Privacy Policy button with custom dialog
+        privacy_policy_button = customtkinter.CTkButton(
+            button_frame,
+            text="Privacy Policy",
+            width=200,
+            height=50,
+            corner_radius=10,
+            command=show_privacy_policy_custom  # Show the custom dialog when clicked
+        )
+        privacy_policy_button.pack(pady=5)
+
+        # Function to show custom Contact Us dialog
+        def show_contact_us():
+            # Create a new top-level window
+            dialog = customtkinter.CTkToplevel()
+            dialog.title("Contact Us")
+            dialog.geometry("400x300")  # Set the size of the dialog
+            dialog.transient(self)
+            dialog.focus_set()
+            dialog.grab_set()
+            dialog.lift()
+            
+            # Add a label to the dialog
+            label = customtkinter.CTkLabel(dialog, text="If you have any questions, feel free to contact us.", font=("Helvetica", 14))
+            label.pack(padx=20, pady=10)
+            
+            # Add a Textbox for contact message
+            message_label = customtkinter.CTkLabel(dialog, text="Your Message:", font=("Helvetica", 12))
+            message_label.pack(padx=20, pady=10, anchor="w")
+            
+            message_entry = customtkinter.CTkEntry(dialog, width=300)
+            message_entry.pack(padx=20, pady=5)
+            
+            # Add a Send button
+            send_button = customtkinter.CTkButton(dialog, text="Send Message", command=dialog.destroy)
+            send_button.pack(pady=10)
+            
+            # Add a Close button
+            close_button = customtkinter.CTkButton(dialog, text="Close", command=dialog.destroy)
+            close_button.pack(pady=5)
+
+        # Contact Us button with custom dialog
+        contact_us_button = customtkinter.CTkButton(
+            button_frame,
+            text="Contact Us",
+            width=200,
+            height=50,
+            corner_radius=10,
+            command=show_contact_us  # Show the custom dialog when clicked
+        )
+        contact_us_button.pack(pady=5)
+
+        # Function to show custom User Management dialog
+        def show_user_management():
+            # Create a new top-level window
+            dialog = customtkinter.CTkToplevel()
+            dialog.title("User Management")
+            dialog.geometry("400x400")  # Set the size of the dialog
+            dialog.transient(self)
+            dialog.focus_set()
+            dialog.grab_set()
+            dialog.lift()
+            
+            # Add a label to the dialog
+            label = customtkinter.CTkLabel(dialog, text="Manage your users here.", font=("Helvetica", 14))
+            label.pack(padx=20, pady=10)
+            
+            # Add a Textbox for user name
+            user_label = customtkinter.CTkLabel(dialog, text="Username:", font=("Helvetica", 12))
+            user_label.pack(padx=20, pady=10, anchor="w")
+            
+            user_entry = customtkinter.CTkEntry(dialog, width=300)
+            user_entry.pack(padx=20, pady=5)
+            
+            # Add a Textbox for email
+            email_label = customtkinter.CTkLabel(dialog, text="Email address:", font=("Helvetica", 12))
+            email_label.pack(padx=20, pady=10, anchor="w")
+            
+            email_entry = customtkinter.CTkEntry(dialog, width=300)
+            email_entry.pack(padx=20, pady=5)
+
+            # Add a Textbox for contact
+            contact_label = customtkinter.CTkLabel(dialog, text="Contact number:", font=("Helvetica", 12))
+            contact_label.pack(padx=20, pady=10, anchor="w")
+            
+            contact_entry = customtkinter.CTkEntry(dialog, width=300)
+            contact_entry.pack(padx=20, pady=5)
+            
+            # Add a Save button
+            save_button = customtkinter.CTkButton(dialog, text="Save User", command=dialog.destroy)
+            save_button.pack(pady=10)
+            
+            # Add a Close button
+            close_button = customtkinter.CTkButton(dialog, text="Close", command=dialog.destroy)
+            close_button.pack(pady=5)
+
+        # User Management button with custom dialog
+        user_management_button = customtkinter.CTkButton(
+            button_frame,
+            text="User Management",
+            width=200,
+            height=50,
+            corner_radius=10,
+            command=show_user_management  # Show the custom dialog when clicked
+        )
+        user_management_button.pack(pady=5)
+
+        """Create smaller inner frame within the content frame"""
+        inner_frame = customtkinter.CTkFrame(
+            parent_frame,
+            fg_color="#d9d9d9",  # Light gray background for visibility
+            width=250,           # Width smaller than the content_frame
+            height=300,          # Height smaller than the content_frame
+            corner_radius=15
+        )
+        inner_frame.pack(side='left', anchor='center', padx=10, pady=10)  # Align to the left of the parent frame
+        inner_frame.pack_propagate(False)
+
+        # Add labels and text box inside the inner frame
+        name = customtkinter.CTkLabel(inner_frame, text="Name:", text_color='black', font=('Helvetica', 16))
+        name.pack(padx=10, pady=(10, 5), anchor='nw')
+
+        email = customtkinter.CTkLabel(inner_frame, text="Email address:", text_color='black', font=('Helvetica', 16))
+        email.pack(padx=10, pady=(5, 10), anchor='nw')
+
+        contact = customtkinter.CTkLabel(inner_frame, text="Contact address:", text_color='black', font=('Helvetica', 16))
+        contact.pack(padx=10, pady=(5, 10), anchor='nw')
+        
+
+    
+    # Logout function
         settings_label = customtkinter.CTkLabel(frame, text="Settings", font=("Arial", 18, "bold"))
         settings_label.pack(pady=20)
 
