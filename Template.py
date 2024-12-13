@@ -7,6 +7,7 @@ import numpy as np
 from scipy.interpolate import make_interp_spline
 import random
 from datetime import datetime
+import subprocess
 
 customtkinter.set_default_color_theme("green")
 
@@ -35,6 +36,10 @@ class Appliance:
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
+        
+        self.geometry("1600x900")
+        self.title("SEMS")
+        
         self.title("Insert Window title")
         self.state('zoomed')
 
@@ -78,6 +83,10 @@ class App(customtkinter.CTk):
         self.sidebar.grid(row=0, column=0, rowspan=2, sticky="nsew")
         self.sidebar.grid_propagate(False)
         self.sidebar.grid_columnconfigure(0, weight=1)  # Center the buttons
+        
+        # Logout button
+        logout_btn = customtkinter.CTkButton(self, text="Logout", command=self.logout)
+        logout_btn.grid(row=11, column=0, padx=20, pady=20, sticky="s")
 
         # Add logo icon to the sidebar
         self.add_logo_to_sidebar()
@@ -103,7 +112,7 @@ class App(customtkinter.CTk):
     def create_tabs(self):
         """Create tab buttons and their corresponding content."""
         # Define tab names with "Dashboard" and "Appliance" as specific tabs
-        tab_names = ["Dashboard", "2", "Appliance", "Notifications"]
+        tab_names = ["Dashboard", "WIP", "Appliance", "Notifications", "Settings"]
         for index, name in enumerate(tab_names):
             self.create_tab_button(name, index)
             self.create_tab_content(index)
@@ -128,6 +137,8 @@ class App(customtkinter.CTk):
             self.create_appliance_content(frame)
         elif index == 3: # Notification Page
             self.create_notification_tab(frame)
+        elif index == 4: # Settings Page
+            self.create_settings_tab(frame)
         else:
             # Add a label to the frame for other tabs
             label = customtkinter.CTkLabel(frame, text=f"Content for Tab {index + 1}")
@@ -597,7 +608,7 @@ class App(customtkinter.CTk):
         # Save Button
         save_btn = customtkinter.CTkButton(dialog, text="Save Appliance", command=save_appliance)
         save_btn.pack(pady=20)
-
+    
     def search_appliances(self, search_term):
         """Search appliances by name"""
         # Clear existing items in list frame
@@ -944,7 +955,6 @@ class App(customtkinter.CTk):
             notification = customtkinter.CTkLabel(notifications_2frame, text=f"Notification {i+1}", text_color='black', font=('Helvetica', 12))
             notification.pack(pady=5, anchor='nw')
 
-
     def show_tab(self, index):
         """Display the content of the selected tab."""
         # Show the selected tab and hide others
@@ -959,6 +969,37 @@ class App(customtkinter.CTk):
         self.main_content.grid_columnconfigure(0, weight=1)
 
         self.update_idletasks()
+        
+    
+#SETTINGS PAGE -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def create_settings_tab(self, frame):
+
+        settings_label = customtkinter.CTkLabel(frame, text="Settings", font=("Arial", 18, "bold"))
+        settings_label.pack(pady=20)
+
+        # Create a frame for settings content
+        settings_frame = customtkinter.CTkFrame(frame, fg_color="#f0f0f0", corner_radius=10)
+        settings_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Energy-saving mode toggle
+        self.energy_mode_var = customtkinter.StringVar(value="Off")
+        energy_mode_label = customtkinter.CTkLabel(settings_frame, text="Energy-saving Mode:")
+        energy_mode_label.pack(pady=5)
+        energy_mode_toggle = customtkinter.CTkSwitch(settings_frame, text="Enable", variable=self.energy_mode_var, onvalue="On", offvalue="Off")
+        energy_mode_toggle.pack(pady=5)
+
+        # Additional settings widgets can be added here
+        # Example: Add a slider for brightness control
+        brightness_label = customtkinter.CTkLabel(settings_frame, text="Brightness:")
+        brightness_label.pack(pady=5)
+        brightness_slider = customtkinter.CTkSlider(settings_frame, from_=0, to=100)
+        brightness_slider.pack(pady=5)
+    
+    
+    # Logout function
+    def logout(self):
+        self.destroy()  # Close the current window
+        subprocess.run(["python", "Final_Product.py"])
 
 if __name__ == "__main__":
     app = App()
