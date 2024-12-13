@@ -935,7 +935,6 @@ class App(customtkinter.CTk):
                 command=lambda a=appliance: self.create_schedule_dialog(a)
             )
             schedule_btn.pack(side='right', padx=5)
-
             # Power button
             power_btn = customtkinter.CTkButton(
                 btn_frame,
