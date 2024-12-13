@@ -41,12 +41,15 @@ class App(customtkinter.CTk):
         """Appliance List"""
         self.appliances = []
         self.appliance_buttons = {}
+
         self.accumulated_wattage = 0
         self.start_time = time.time()
-
+        
         # Initialize data for plotting
         self.x_data = []
         self.y_data = []
+        self.daily_wattage = [0] * 31
+        self.monthly_wattage = [0] * 12
         
         # Configure grid layout for the main window
         self.configure_grid()
@@ -250,17 +253,26 @@ class App(customtkinter.CTk):
         for appliance in self.appliances:
             if appliance.state == 'ON':
                 self.accumulated_wattage += (appliance.wattage / 3600) * elapsed_time  # Convert wattage to watt-hours
+        # Update daily wattage
+        current_day = datetime.now().day - 1  
+        self.daily_wattage[current_day] += self.accumulated_wattage
+
+        # Update monthly wattage
+        current_month = datetime.now().month - 1  # Get the current month (0-indexed)
+        self.monthly_wattage[current_month] += self.accumulated_wattage
 
         return self.accumulated_wattage
     
     def calculate_total_wattage(self):
         """Calculate the total wattage based on running appliances."""
         total_wattage = 0
+        current_time = time.time()
+        elapsed_time = current_time - self.start_time  # Time in seconds
 
         # Calculate the total wattage of running appliances
         for appliance in self.appliances:
             if appliance.state == 'ON':
-                total_wattage += appliance.wattage  # Sum up the wattage of all running appliances
+                total_wattage += (appliance.wattage / 3600) * elapsed_time  # Sum up the wattage of all running appliances
 
         return total_wattage
 
@@ -324,49 +336,48 @@ class App(customtkinter.CTk):
 
     def create_bar_graph_for_month(self, parent):
         """Create a bar graph for the month."""
+        current_month = datetime.now().strftime("%B")
+        current_year = datetime.now().year
         # Define data for the bar graph
         x = list(range(1, 32))
-        y = [23, 45, 56, 78, 43] + [0] * 26
+        y = self.daily_wattage
 
         # Create a matplotlib figure and axis
         fig, ax = plt.subplots(figsize=(10, 4))
         ax.bar(x, y)
 
         # Set labels and title
-        ax.set_xlabel('Categories')
-        ax.set_ylabel('Values')
-        ax.set_title('Sample Bar Graph')
+        ax.set_xlabel('Day of the Month')
+        ax.set_ylabel('Accumulated Wattage (kWh)')
+        ax.set_title(f'Daily Accumulated Wattage for {current_month} {current_year}')
         ax.tick_params(labelsize=8)
 
-        # Embed the plot in the Tkinter application
-        canvas = FigureCanvasTkAgg(fig, master=parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(padx=2, pady=2)
-        plt.tight_layout()
-        plt.close(fig)
+        # Display the graph in the Tkinter window
+        self.canvas = FigureCanvasTkAgg(fig, master=parent)
+        self.canvas.get_tk_widget().pack(padx=2, pady=2)     
 
     def create_bar_graph_for_year(self, parent):
         """Create a bar graph for the year."""
         # Define data for the bar graph
         x = list(range(1, 13))
-        y = [2, 5, 3, 8, 6, 7, 1, 4, 9, 5, 0, 0]
+        y = self.monthly_wattage
+
+        # Get the current year
+        current_year = datetime.now().year
 
         # Create a matplotlib figure and axis
         fig, ax = plt.subplots(figsize=(10, 4))
         ax.bar(x, y)
 
         # Set labels and title
-        ax.set_xlabel('Categories')
-        ax.set_ylabel('Values')
-        ax.set_title('Sample Bar Graph')
+        ax.set_xlabel('Month')
+        ax.set_ylabel('Accumulated Wattage (kWh)')
+        ax.set_title(f'Monthly Accumulated Wattage for {current_year}')
         ax.tick_params(labelsize=8)
 
-        # Embed the plot in the Tkinter application
-        canvas = FigureCanvasTkAgg(fig, master=parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(padx=2, pady=2)
-        plt.tight_layout()
-        plt.close(fig)
+        # Display the graph in the Tkinter window
+        self.canvas = FigureCanvasTkAgg(fig, master=parent)
+        self.canvas.get_tk_widget().pack(padx=2, pady=2)
 
     def create_appliance_controls_frame(self, parent):
         """Create controls for managing appliances."""
@@ -442,7 +453,7 @@ class App(customtkinter.CTk):
 
         # Debugging: Print the actual size after layout
         self.after(100, lambda: print("Notification Frame Size:", goal_frame.winfo_width(), goal_frame.winfo_height()))
-
+    
     def create_goal_tracker_content(self, frame):
         """Create content for the goal tracker frame."""
         accumulated_consumption = 120.50
@@ -458,18 +469,28 @@ class App(customtkinter.CTk):
             justify='center', 
             text_color="black"
         )
-
         goal_tracker_label.grid(row=0, column=1, padx=(0,15), pady=(5,0), sticky='sew')
 
-        tracker_slash_label = customtkinter.CTkLabel(frame, 
-            text=f"P {accumulated_consumption} / P {set_goal}", 
+        self.tracker_slash_label = customtkinter.CTkLabel(frame, 
+            text="Accumulated Wattage: 0 kWh", 
             font=('Arial', 20, 'bold'), 
             wraplength=200, 
             justify='center', 
             text_color='#8e8e8e'
         )
+        self.tracker_slash_label.grid(row=1, column=1, padx=(0,15), sticky='new')
+        self.update_accumulated_wattage_label()
 
-        tracker_slash_label.grid(row=1, column=1, padx=(0,15), sticky='new')
+    def update_accumulated_wattage_label(self):
+        """Update the accumulated wattage label every second."""
+        if not self.winfo_exists():
+            return  # Exit if the window has been destroyed
+
+        accumulated_wattage = self.calculate_accumulated_wattage()
+        print(accumulated_wattage)
+        self.tracker_slash_label.configure(text=f"Accumulated Wattage: {accumulated_wattage:.2f} kWh")
+
+        self.after(1000, self.update_accumulated_wattage_label)  # Update every second
 
     def create_notification_shortcut_frame(self, parent):
         notification_shortcut_frame = customtkinter.CTkFrame(parent, width=350, height=120, corner_radius=20, fg_color='white', border_width=1, border_color='#b2b2b2',)
