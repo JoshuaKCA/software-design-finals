@@ -25,6 +25,19 @@ class Appliance:
         self.schedule_start = schedule_start
         self.schedule_end = schedule_end
 
+    def save_to_file(self, filename):
+        with open(filename, 'a') as file:
+            file.write(f"{self.name},{self.wattage},{self.unit},{self.schedule_start},{self.schedule_end},{self.state}\n")
+            
+    def load_from_file(cls, filename):
+        appliances = []
+        with open(filename, 'r') as file:
+            for line in file:
+                name, wattage, unit, schedule_start, schedule_end, state = line.strip().split(',')
+                wattage = float(wattage)
+                appliances.append(cls(name, wattage, unit, schedule_start, schedule_end, state))
+        return appliances
+    
     def display_wattage(self):
         if self.unit == "kW":
             display_value = self.wattage / 1000
@@ -821,6 +834,8 @@ class App(customtkinter.CTk):
                 # Add to appliance list
                 self.appliances.append(new_appliance)
                 
+                new_appliance.save_to_file("appliances.txt")
+
                 # Refresh the appliance list display
                 self.refresh_appliance_list()
                 
@@ -1009,6 +1024,7 @@ class App(customtkinter.CTk):
                 self.appliances.remove(appliance)
                 self.refresh_appliance_list()
                 self.create_appliance_controls_content(self.appliance_control_frame)
+                self.update_appliance_file()
             dialog.destroy()
 
         def cancel_delete():
@@ -1068,12 +1084,19 @@ class App(customtkinter.CTk):
             appliance.unit = unit_var.get()
             self.refresh_appliance_list()
             self.create_appliance_controls_content(self.appliance_control_frame)
+            # Update the appliance file
+            self.update_appliance_file()
             dialog.destroy()
 
         # Save Button
         save_btn = customtkinter.CTkButton(dialog, text="Save Changes", command=save_changes)
         save_btn.pack(pady=20)
 
+    def update_appliance_file(self):
+        """Update the appliance file with the current list of appliances."""
+        with open("appliances.txt", 'w') as file:
+            for appliance in self.appliances:
+                file.write(f"{appliance.name},{appliance.wattage},{appliance.unit},{appliance.schedule_start},{appliance.schedule_end},{appliance.state}\n")
     def create_schedule_dialog(self, appliance):
         dialog = customtkinter.CTkToplevel(self)
         dialog.title(f"Schedule {appliance.name}")
