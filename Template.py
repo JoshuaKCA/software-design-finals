@@ -55,7 +55,7 @@ class App(customtkinter.CTk):
         self.main_content = customtkinter.CTkFrame(self, fg_color="#f0f0f0", corner_radius=0)
         self.main_content.grid(row=1, column=0, columnspan=2, sticky="nsew")
 
-   
+# SETTINGS -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     def on_settings_button_click(self):
         """Handle the Settings button click."""
         print("Settings button clicked!")
@@ -100,6 +100,7 @@ class App(customtkinter.CTk):
 
         # Bring the label in front of the grey square
         settings_label.tkraise()
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     def toggle_energy_mode(self):
         """Toggle the energy-saving mode."""
