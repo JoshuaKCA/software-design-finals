@@ -7,6 +7,8 @@ import numpy as np
 from scipy.interpolate import make_interp_spline
 import random
 from datetime import datetime
+import time
+import matplotlib.dates as mdates
 
 customtkinter.set_default_color_theme("green")
 
@@ -30,8 +32,6 @@ class Appliance:
             display_value = self.wattage
         return f"{display_value}"
 
-
-
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
@@ -39,8 +39,15 @@ class App(customtkinter.CTk):
         self.state('zoomed')
 
         """Appliance List"""
-        self.appliances = [] 
+        self.appliances = []
         self.appliance_buttons = {}
+        self.accumulated_wattage = 0
+        self.start_time = time.time()
+
+        # Initialize data for plotting
+        self.x_data = []
+        self.y_data = []
+        
         # Configure grid layout for the main window
         self.configure_grid()
 
@@ -232,46 +239,74 @@ class App(customtkinter.CTk):
             graph1_btn.pack(side='left',  fill='y')
             graph2_btn.pack(side='left',  fill='y')
             graph3_btn.pack(side='left',  fill='y')
+    
+    def calculate_accumulated_wattage(self):
+        """Calculate the accumulated wattage based on running appliances."""
+        current_time = time.time()
+        elapsed_time = current_time - self.start_time  # Time in seconds
+        self.start_time = current_time
+
+        # Calculate the wattage consumed in the elapsed time
+        for appliance in self.appliances:
+            if appliance.state == 'ON':
+                self.accumulated_wattage += (appliance.wattage / 3600) * elapsed_time  # Convert wattage to watt-hours
+
+        return self.accumulated_wattage
+    
+    def calculate_total_wattage(self):
+        """Calculate the total wattage based on running appliances."""
+        total_wattage = 0
+
+        # Calculate the total wattage of running appliances
+        for appliance in self.appliances:
+            if appliance.state == 'ON':
+                total_wattage += appliance.wattage  # Sum up the wattage of all running appliances
+
+        return total_wattage
+
+    def update_total_wattage(self):
+        """Update the total wattage every second."""
+        if not self.winfo_exists():
+            return  # Exit if the window has been destroyed
+
+        current_time = datetime.now()
+        self.x_data.append(current_time)
+        self.y_data.append(self.calculate_total_wattage())
+
+        self.after(1000, self.update_total_wattage)  # Update every second
 
     def create_line_graph(self, parent):
-        """Create a sinusoidal wattage line graph."""
-        # Generate sample data for wattage (simulated data for demonstration)
-        hours = np.array([hour for hour in range(24)])
-        wattage = np.array([np.sin(hour / 3.0) + random.uniform(-0.1, 0.1) for hour in hours])  # Simulated sinusoidal data
+        """Create a real-time wattage line graph."""
+        self.fig, self.ax = plt.subplots(figsize=(10, 4))
+        self.canvas = FigureCanvasTkAgg(self.fig, master=parent)
+        self.canvas.get_tk_widget().pack(padx=2, pady=2)
 
-        # Create a smooth curve using spline interpolation
-        x_smooth = np.linspace(hours.min(), hours.max(), 300)  # More points for a smoother curve
-        spl = make_interp_spline(hours, wattage, k=3)  # Cubic spline
-        wattage_smooth = spl(x_smooth)
+        self.ax.set_ylabel("Power (kW)")
+        self.ax.legend(["Wattage"], loc="upper right")
+        self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
 
-        # Create a matplotlib figure and axis
-        fig, ax = plt.subplots(figsize=(10, 4))
-        ax.plot(x_smooth, wattage_smooth, label="Wattage", color="orange", linewidth=2)
-        ax.fill_between(x_smooth, wattage_smooth, color="orange", alpha=0.3)  # Filled area under the curve
-        ax.axhline(0, color="gray", linewidth=0.5)  # Zero line
+        self.line, = self.ax.plot(self.x_data, self.y_data, label="Wattage", color="orange", linewidth=2)
 
-        ax.spines['top'].set_visible(False)  # Remove the top border
-        ax.spines['right'].set_visible(False)
+        self.update_line_graph()
 
-        ax.set_xlim(x_smooth[0], x_smooth[-1]) 
+    def update_line_graph(self):
+        """Update the line graph with new data."""
+        if not self.winfo_exists():
+            return  # Exit if the window has been destroyed
 
-        # Set labels and title
-        ax.set_ylabel("Power (kW)")
-        ax.set_ylim(0, 1.5)  # Set the y-axis limits to match the example
-        ax.legend(["Wattage"], loc="upper right")
+        current_time = datetime.now()
+        self.x_data.append(current_time)
+        self.y_data.append(self.calculate_total_wattage())
 
-        # Customize the x-axis ticks
-        ax.set_xticks(hours)
-        ax.set_xticklabels([f"{hour:02d}:00" for hour in hours], rotation=45)
+        self.line.set_data(self.x_data, self.y_data)
 
-        # Embed the plot in the Tkinter application
-        canvas = FigureCanvasTkAgg(fig, master=parent)
-        canvas.draw()
-        canvas.get_tk_widget().pack(padx=2, pady=2)
+        # Make the y-axis dynamic
+        self.ax.relim()
+        self.ax.autoscale_view()
 
-        plt.tight_layout()
-        plt.close(fig)
+        self.canvas.draw()
 
+        self.after(1000, self.update_line_graph)  # Update every second
     def switch_graph(self, graph_index, parent):
         """Switch between different graphs."""
         # Clear existing graph widgets
