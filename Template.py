@@ -380,7 +380,7 @@ class App(customtkinter.CTk):
 
         # Set labels and title
         ax.set_xlabel('Day of the Month')
-        ax.set_ylabel('Accumulated Wattage (kWh)')
+        ax.set_ylabel('Accumulated Wattage (Wh)')
         ax.set_title(f'Daily Accumulated Wattage for {current_month} {current_year}')
         ax.tick_params(labelsize=8)
         ax.legend()
@@ -421,7 +421,7 @@ class App(customtkinter.CTk):
         
         # Set labels and title
         ax.set_xlabel('Month')
-        ax.set_ylabel('Accumulated Wattage (kWh)')
+        ax.set_ylabel('Accumulated Wattage (Wh)')
         ax.set_title(f'Monthly Accumulated Wattage for {current_year}')
         ax.set_xticks(x)
         ax.set_xticklabels(months, rotation=45)
