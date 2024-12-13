@@ -112,7 +112,7 @@ class App(customtkinter.CTk):
     def create_tabs(self):
         """Create tab buttons and their corresponding content."""
         # Define tab names with "Dashboard" and "Appliance" as specific tabs
-        tab_names = ["Dashboard", "WIP", "Appliance", "Notifications", "Settings"]
+        tab_names = ["Dashboard", "Analytics", "Appliance", "Notifications", "Settings"]
         for index, name in enumerate(tab_names):
             self.create_tab_button(name, index)
             self.create_tab_content(index)
@@ -133,6 +133,8 @@ class App(customtkinter.CTk):
 
         if index == 0:  # Dashboard Page
             self.create_dashboard_content(frame)
+        elif index == 1:  # Analytics Page
+            self.create_analytics_content(frame)
         elif index == 2:  # Appliance Page
             self.create_appliance_content(frame)
         elif index == 3: # Notification Page
@@ -995,8 +997,46 @@ class App(customtkinter.CTk):
         brightness_slider = customtkinter.CTkSlider(settings_frame, from_=0, to=100)
         brightness_slider.pack(pady=5)
     
+#ANALYTICS PAGE -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------    
+    def create_analytics_content(self, frame):
+        analytics_label = customtkinter.CTkLabel(frame, text="ANALYTICS", text_color='black', font=('Helvetica', 24))
+        analytics_label.pack(padx=30, pady=(15, 0), anchor='nw')
+
+    # Create a container frame to hold both the line graph and appliance control frames
+        top_frame = customtkinter.CTkFrame(frame, fg_color="transparent")
+        top_frame.pack(side='top', anchor='center', expand=False, padx=30, pady=(15, 0), fill='x')
+
+        # Create line graph content
+        self.create_line_graph_frame(top_frame)
+
+        # Create appliance controls beside the line graph
+        self.create_appliance_controls_frame(top_frame)
+
+        # Create a container frame to hold both the goal tracker and notification shortcut frames
+        bottom_frame = customtkinter.CTkFrame(frame, fg_color="transparent")
+        bottom_frame.pack(side='bottom', anchor='center', expand=False, padx=70, pady=15, fill='x')
+
+        # Create the goal tracker content
+        self.create_goal_tracker_frame(bottom_frame)
+        # Create the notification shortcut content
+        self.create_notification_shortcut_frame(bottom_frame)
+        
+    def create_notification_shortcut_frame_content(self, frame):
+        """Create content for the notification shortcut frame."""
+        image_placeholder = customtkinter.CTkFrame(frame, fg_color="green", height=100, width=100, corner_radius=50)
+        image_placeholder.grid(row=0, rowspan=2, column=0, padx=15, pady=10, sticky='w')
+
+        notice_label = customtkinter.CTkLabel(frame, text="Notification", font=('Arial', 18, 'bold'), text_color="black")
+        notice_label.grid(row=0, column=1, padx=5, pady=(15,0), sticky='w')
+
+        notice_content = customtkinter.CTkLabel(frame, 
+            text="Your electricity bill is due on 20th of this month. Please pay it on time.",
+             font=('Arial', 14), wraplength=200, justify='left', text_color='#8e8e8e')
+
+        notice_content.grid(row=1, column=1, padx=(5,10), sticky='nw')
     
-    # Logout function
+    
+#LOGOUT FUNCTION -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     def logout(self):
         self.destroy()  # Close the current window
         subprocess.run(["python", "Final_Product.py"])
