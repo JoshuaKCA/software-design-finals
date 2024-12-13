@@ -438,7 +438,6 @@ class App(customtkinter.CTk):
         self.canvas = FigureCanvasTkAgg(fig, master=parent)
         self.canvas.get_tk_widget().pack(padx=2, pady=2)
 
-
     def create_appliance_controls_frame(self, parent):
         """Create controls for managing appliances."""
         # Create a frame for appliance controls
