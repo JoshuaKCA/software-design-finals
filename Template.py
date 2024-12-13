@@ -51,6 +51,8 @@ class App(customtkinter.CTk):
         self.title("EnerCheck")
         self.state('zoomed')
 
+        self.monthly_goal = None
+
         """Appliance List"""
         self.appliances = []
         self.appliance_buttons = {}
@@ -536,7 +538,7 @@ class App(customtkinter.CTk):
             self.last_update_month = current_month
 
         self.after(1000, self.start_monthly_cost_tracking)
-
+        self.check_goal_notifications()
 
     def create_goal_tracker_content(self, frame):
         """Create content for the goal tracker frame."""
@@ -631,7 +633,7 @@ class App(customtkinter.CTk):
         self.after(1000, self.update_goal_progress)
 
     def convert_wattage_to_cost(self, wattage):
-        """Convert accumulated wattage to cost in Philippine Peso."""
+        """Accumulated wattage to cost in Philippine Peso."""
         cost_per_watt = 0.0024  # 1 Watt = 0.0024 Pesos
         return wattage * cost_per_watt
 
@@ -1166,6 +1168,7 @@ class App(customtkinter.CTk):
 #NOTIFICATION PAGE ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
     def create_notification_tab(self, frame):
         """Create content for the Notification tab."""
+        self.notifications_list = []
         notification_label = customtkinter.CTkLabel(frame, text="NOTIFICATION", text_color='black', font=('Helvetica', 24))
         notification_label.pack(padx=20, pady=(15, 0), anchor='nw')
         
@@ -1191,13 +1194,57 @@ class App(customtkinter.CTk):
         filter_by_combobox = customtkinter.CTkComboBox(notifications_frame, state="readonly", values=["All", "Unread", "Read"], font=('Helvetica', 12))
         filter_by_combobox.grid(row=0, column=3, padx=(0,20), pady=(20,0), sticky='e')
         
-        notifications_2frame = customtkinter.CTkScrollableFrame(notifications_frame, fg_color="white", width=760, height=540, corner_radius=15)
-        notifications_2frame.grid(row=1, column=0, columnspan=4, padx=15, pady=(25,15), sticky='nsew')
+        self.notifications_2frame = customtkinter.CTkScrollableFrame(notifications_frame, fg_color="white", width=760, height=540, corner_radius=15)
+        self.notifications_2frame.grid(row=1, column=0, columnspan=4, padx=15, pady=(25,15), sticky='nsew')
+        self.check_goal_notifications()
 
-        # Add hardcoded notifications
-        for i in range(5):
-            notification = customtkinter.CTkLabel(notifications_2frame, text=f"Notification {i+1}", text_color='black', font=('Helvetica', 12))
-            notification.pack(pady=5, anchor='nw')
+    def check_goal_notifications(self):
+        """Create notifications based on goal progress"""
+        if self.monthly_goal is not None:
+            percentage = (self.monthly_accumulated_cost / self.monthly_goal) * 100
+            
+            for widget in self.notifications_2frame.winfo_children():
+                widget.destroy()
+                
+            # Create card-style notification
+            def create_notification_card(message, urgency_color):
+                card = customtkinter.CTkFrame(
+                    self.notifications_2frame,
+                    fg_color="white",
+                    corner_radius=10,
+                    border_width=2,
+                    border_color=urgency_color
+                )
+                card.pack(fill='x', padx=10, pady=5)
+                
+                notification = customtkinter.CTkLabel(
+                    card,
+                    text=message,
+                    text_color='black',
+                    font=('Helvetica', 12),
+                    wraplength=600
+                )
+                notification.pack(pady=10, padx=10)
+                
+            if percentage >= 100:
+                create_notification_card(
+                    "⚠️ Alert: Monthly goal exceeded! Current usage: {:.2f} PHP".format(self.monthly_accumulated_cost),
+                    "#ff0000"  # Red for exceeded
+                )
+            elif percentage >= 75:
+                create_notification_card(
+                    "⚠️ Warning: Approaching monthly goal! Usage at 75%",
+                    "#ffa500"  # Orange for warning
+                )
+            elif percentage >= 50:
+                create_notification_card(
+                    "ℹ️ Notice: Usage reached 50% of monthly goal",
+                    "#ffff00"  # Yellow for notice
+                )
+
+            # Update notifications every minute
+            self.after(60000, self.check_goal_notifications)
+
 
 #SETTINGS PAGE -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     def create_settings_tab(self, frame):

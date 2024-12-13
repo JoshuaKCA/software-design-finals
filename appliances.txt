@@ -1,1 +1,8 @@
 AC Inverter,1500.0,kW,None,None,OFF
+1.2,15000.0,kW,None,None,OFF
+MEGA,200000.0,kW,None,None,OFF
+test,120000.0,kW,None,None,OFF
+10,1500000.0,kW,None,None,OFF
+12,200000.0,kW,None,None,OFF
+1,500000.0,kW,None,None,OFF
+1212,50000000.0,kW,None,None,OFF
