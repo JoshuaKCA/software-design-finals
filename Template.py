@@ -50,6 +50,7 @@ class App(customtkinter.CTk):
         super().__init__()
         self.title("EnerCheck")
         self.state('zoomed')
+        self.geometry("1600x900")
 
         self.monthly_goal = None
 
