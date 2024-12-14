@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 from scipy.interpolate import make_interp_spline
-import random
 from datetime import datetime
 import time
 import matplotlib.dates as mdates
+import subprocess
 
 customtkinter.set_default_color_theme("green")
 
@@ -25,6 +25,19 @@ class Appliance:
         self.schedule_start = schedule_start
         self.schedule_end = schedule_end
 
+    def save_to_file(self, filename):
+        with open(filename, 'a') as file:
+            file.write(f"{self.name},{self.wattage},{self.unit},{self.schedule_start},{self.schedule_end},{self.state}\n")
+            
+    def load_from_file(cls, filename):
+        appliances = []
+        with open(filename, 'r') as file:
+            for line in file:
+                name, wattage, unit, schedule_start, schedule_end, state = line.strip().split(',')
+                wattage = float(wattage)
+                appliances.append(cls(name, wattage, unit, schedule_start, schedule_end, state))
+        return appliances
+    
     def display_wattage(self):
         if self.unit == "kW":
             display_value = self.wattage / 1000
@@ -37,6 +50,8 @@ class App(customtkinter.CTk):
         super().__init__()
         self.title("EnerCheck")
         self.state('zoomed')
+
+        self.monthly_goal = None
 
         """Appliance List"""
         self.appliances = []
@@ -91,6 +106,11 @@ class App(customtkinter.CTk):
         self.sidebar.grid_propagate(False)
         self.sidebar.grid_columnconfigure(0, weight=1)  # Center the buttons
 
+
+        # Logout button
+        logout_btn = customtkinter.CTkButton(self, text="Logout", command=self.logout)
+        logout_btn.grid(row=11, column=0, padx=20, pady=20, sticky="s")
+
         # Add logo icon to the sidebar
         self.add_logo_to_sidebar()
 
@@ -115,7 +135,7 @@ class App(customtkinter.CTk):
     def create_tabs(self):
         """Create tab buttons and their corresponding content."""
         # Define tab names with "Dashboard" and "Appliance" as specific tabs
-        tab_names = ["Dashboard", "Appliance", "Notifications"]
+        tab_names = ["Dashboard", "Appliance", "Notifications", "Settings"]
         for index, name in enumerate(tab_names):
             self.create_tab_button(name, index)
             self.create_tab_content(index)
@@ -140,6 +160,8 @@ class App(customtkinter.CTk):
             self.create_appliance_content(frame)
         elif index == 2: # Notification Page
             self.create_notification_tab(frame)
+        elif index == 3: # Notification Page
+            self.create_settings_tab(frame)
         else:
             # Add a label to the frame for other tabs
             label = customtkinter.CTkLabel(frame, text=f"Content for Tab {index + 1}")
@@ -173,7 +195,7 @@ class App(customtkinter.CTk):
          # Create the cost tracker content
         self.create_wattage_tracker_frame(bottom_frame)
         # Create the notification shortcut content
-        self.create_notification_shortcut_frame(bottom_frame)
+       
 
     def create_line_graph_frame(self, parent):
         """Create a frame to hold line graphs."""
@@ -373,7 +395,7 @@ class App(customtkinter.CTk):
 
         # Set labels and title
         ax.set_xlabel('Day of the Month')
-        ax.set_ylabel('Accumulated Wattage (kWh)')
+        ax.set_ylabel('Accumulated Wattage (Wh)')
         ax.set_title(f'Daily Accumulated Wattage for {current_month} {current_year}')
         ax.tick_params(labelsize=8)
         ax.legend()
@@ -414,7 +436,7 @@ class App(customtkinter.CTk):
         
         # Set labels and title
         ax.set_xlabel('Month')
-        ax.set_ylabel('Accumulated Wattage (kWh)')
+        ax.set_ylabel('Accumulated Wattage (Wh)')
         ax.set_title(f'Monthly Accumulated Wattage for {current_year}')
         ax.set_xticks(x)
         ax.set_xticklabels(months, rotation=45)
@@ -430,7 +452,6 @@ class App(customtkinter.CTk):
         # Display the graph
         self.canvas = FigureCanvasTkAgg(fig, master=parent)
         self.canvas.get_tk_widget().pack(padx=2, pady=2)
-
 
     def create_appliance_controls_frame(self, parent):
         """Create controls for managing appliances."""
@@ -490,16 +511,11 @@ class App(customtkinter.CTk):
 
     def create_goal_tracker_frame(self, parent):
         """Create the goal tracker frame."""
-        self.tracker_frame = customtkinter.CTkFrame(parent, width=360, height=180, corner_radius=20, fg_color='white', border_width=1, border_color='#b2b2b2')
-        self.tracker_frame.pack(side='left', anchor='center', expand=True, fill='none', padx=(70, 15), pady=15)
+        self.tracker_frame = customtkinter.CTkFrame(parent, width=500, height=180, corner_radius=20, fg_color='white', border_width=1, border_color='#b2b2b2')
+        self.tracker_frame.pack(side='left', anchor='center', expand=True, fill='none', padx=15, pady=(0,15))
         self.tracker_frame.pack_propagate(True)
 
         # Configure grid weights if needed
-        self.tracker_frame.grid_rowconfigure(0, weight=0)
-        self.tracker_frame.grid_rowconfigure(1, weight=0)
-        self.tracker_frame.grid_columnconfigure(0, weight=1)
-        self.tracker_frame.grid_columnconfigure(1, weight=1)
-
         self.create_goal_tracker_content(self.tracker_frame)
 
         # Debugging: Print the actual size after layout
@@ -522,46 +538,45 @@ class App(customtkinter.CTk):
             self.last_update_month = current_month
 
         self.after(1000, self.start_monthly_cost_tracking)
-
+        self.check_goal_notifications()
 
     def create_goal_tracker_content(self, frame):
         """Create content for the goal tracker frame."""
         self.monthly_goal = None  # Initialize goal as None
         self.monthly_accumulated_cost = 0  # Initialize accumulated cost
+        # Create a label for the goal tracker
+        
+        goal_tracker_label = customtkinter.CTkLabel(frame,
+            text="Monthly Goal Tracker",
+            font=('Arial', 14, 'bold'),
+            wraplength=250,
+            justify='center',
+            text_color="black"
+        )
+        goal_tracker_label.pack(padx=50, pady=(5,0), anchor='center')
 
-        image_placeholder = customtkinter.CTkFrame(frame, fg_color="green", height=100, width=100, corner_radius=50)
-        image_placeholder.grid(row=0, rowspan=2, column=0, padx=15, pady=10, sticky='w')
 
         if self.monthly_goal is None:
             # Show set goal button when no goal is set
             set_goal_button = customtkinter.CTkButton(
                 frame,
                 text="Set Monthly Goal",
-                font=('Arial', 17, 'bold'),
+                font=('Arial', 14, 'bold'),
                 command=self.show_goal_dialog
             )
-            set_goal_button.grid(row=0, rowspan=2, column=1, padx=(0,15), pady=5, sticky='nsew')
+            set_goal_button.pack(padx=50, anchor='center', pady=(0,5), ipadx=10, ipady=10)
         else:
-            # Show progress when goal is set
-            goal_tracker_label = customtkinter.CTkLabel(frame,
-                text="Monthly Goal Tracker",
-                font=('Arial', 17, 'bold'),
-                wraplength=250,
-                justify='center',
-                text_color="black"
-            )
-            goal_tracker_label.grid(row=0, column=1, padx=(0,15), pady=(5,0), sticky='sew')
-
             self.tracker_slash_label = customtkinter.CTkLabel(frame,
                 text=f"{self.monthly_accumulated_cost:.2f} / {self.monthly_goal:.2f} PHP",
-                font=('Arial', 20, 'bold'),
+                font=('Arial', 14, 'bold'),
                 wraplength=200,
                 justify='center',
-                text_color='#8e8e8e'
+                text_color='#8e8e8e',
+                foreground_color='red'
             )
-            self.tracker_slash_label.grid(row=1, column=1, padx=(0,15), sticky='new')
+            self.tracker_slash_label.pack(padx=1000, anchor='center', pady=(0,15), ipadx=10, ipady=10)
             self.update_goal_progress()
-    
+
     def show_goal_dialog(self):
         """Show dialog for setting monthly goal."""
         dialog = customtkinter.CTkToplevel(self)
@@ -618,7 +633,7 @@ class App(customtkinter.CTk):
         self.after(1000, self.update_goal_progress)
 
     def convert_wattage_to_cost(self, wattage):
-        """Convert accumulated wattage to cost in Philippine Peso."""
+        """Accumulated wattage to cost in Philippine Peso."""
         cost_per_watt = 0.0024  # 1 Watt = 0.0024 Pesos
         return wattage * cost_per_watt
 
@@ -634,41 +649,31 @@ class App(customtkinter.CTk):
         # Clear all widgets in the frame
         for widget in self.tracker_frame.winfo_children():
             widget.destroy()
-            
-        # Create new content
-        image_placeholder = customtkinter.CTkFrame(self.tracker_frame, fg_color="green", height=100, width=100, corner_radius=50)
-        image_placeholder.grid(row=0, rowspan=2, column=0, padx=15, pady=10, sticky='w')
 
         goal_tracker_label = customtkinter.CTkLabel(self.tracker_frame,
             text="Monthly Goal Tracker",
-            font=('Arial', 17, 'bold'),
+            font=('Arial', 14, 'bold'),
             wraplength=250,
             justify='center',
             text_color="black"
         )
-        goal_tracker_label.grid(row=0, column=1, padx=(0,15), pady=(5,0), sticky='sew')
+        goal_tracker_label.grid(row=0, column=1, padx=(0,15), pady=(5,0), sticky='sew', ipadx=50, ipady=10)
 
         self.tracker_slash_label = customtkinter.CTkLabel(self.tracker_frame,
             text=f"P {self.monthly_accumulated_cost:.2f} / {self.monthly_goal:.2f} PHP",
-            font=('Arial', 20, 'bold'),
+            font=('Arial', 16, 'bold'),
             wraplength=200,
             justify='center',
             text_color='#8e8e8e'
         )
-        self.tracker_slash_label.grid(row=1, column=1, padx=(0,15), sticky='new')
+        self.tracker_slash_label.grid(row=1, column=1, padx=(0,15), sticky='new', ipadx=50)
         self.update_goal_progress()
 
     def create_wattage_tracker_frame(self, parent):
         """Create the wattage tracker frame."""
-        wattage_frame = customtkinter.CTkFrame(parent, width=360, height=180, corner_radius=20, fg_color='white', border_width=1, border_color='#b2b2b2')
-        wattage_frame.pack(side='left', anchor='center', expand=True, fill='none', padx=15, pady=15)
+        wattage_frame = customtkinter.CTkFrame(parent, width=500, height=180, corner_radius=20, fg_color='white', border_width=1, border_color='#b2b2b2')
+        wattage_frame.pack(side='left', anchor='center', expand=True, fill='none', padx=15, pady=(0,15))
         wattage_frame.pack_propagate(True)
-
-        # Configure grid weights
-        wattage_frame.grid_rowconfigure(0, weight=0)
-        wattage_frame.grid_rowconfigure(1, weight=0)
-        wattage_frame.grid_columnconfigure(0, weight=1)
-        wattage_frame.grid_columnconfigure(1, weight=1)
 
         self.create_wattage_tracker_content(wattage_frame)
 
@@ -677,27 +682,25 @@ class App(customtkinter.CTk):
 
     def create_wattage_tracker_content(self, frame):
         """Create content for the wattage tracker frame."""
-        image_placeholder = customtkinter.CTkFrame(frame, fg_color="green", height=100, width=100, corner_radius=50)
-        image_placeholder.grid(row=0, rowspan=2, column=0, padx=15, pady=10, sticky='w')
-
         wattage_tracker_label = customtkinter.CTkLabel(frame,
             text="Monthly Wattage Tracker",
-            font=('Arial', 17, 'bold'),
+            font=('Arial', 14, 'bold'),
             wraplength=250,
             justify='center',
             text_color="black"
         )
-        wattage_tracker_label.grid(row=0, column=1, padx=(0,15), pady=(5,0), sticky='sew')
+        wattage_tracker_label.pack(padx=50, pady=(5,0), anchor='center')
 
         self.wattage_value_label = customtkinter.CTkLabel(frame,
             text="Accumulated Wattage: 0 kWh",
-            font=('Arial', 20, 'bold'),
+            font=('Arial', 16, 'bold'),
             wraplength=200,
             justify='center',
             text_color='#8e8e8e'
         )
-        self.wattage_value_label.grid(row=1, column=1, padx=(0,15), sticky='new')
+        self.wattage_value_label.pack(padx=50, anchor='center', pady=(0,15))
         self.update_accumulated_wattage_display()
+
 
     def update_accumulated_wattage_display(self):
         """Update the accumulated wattage label every second."""
@@ -710,36 +713,6 @@ class App(customtkinter.CTk):
         
         self.wattage_value_label.configure(text=f"Accumulated Wattage: {display_value:.2f} {unit}")
         self.after(1000, self.update_accumulated_wattage_display)
-
-    def create_notification_shortcut_frame(self, parent):
-        notification_shortcut_frame = customtkinter.CTkFrame(parent, width=350, height=120, corner_radius=20, fg_color='white', border_width=1, border_color='#b2b2b2',)
-        notification_shortcut_frame.pack(side='left', anchor='center', expand=False, fill='none', pady=15)
-        notification_shortcut_frame.pack_propagate(False)
-        
-        # Configure grid weights
-        notification_shortcut_frame.grid_rowconfigure(0, weight=0)
-        notification_shortcut_frame.grid_rowconfigure(1, weight=1)
-        notification_shortcut_frame.grid_columnconfigure(0, weight=0)
-        notification_shortcut_frame.grid_columnconfigure(1, weight=1)
-
-        self.create_notification_shortcut_frame_content(notification_shortcut_frame)
-
-        # Debugging: Print the actual size after layout
-        self.after(100, lambda: print("Notification Frame Size:", notification_shortcut_frame.winfo_width(), notification_shortcut_frame.winfo_height()))
-        
-    def create_notification_shortcut_frame_content(self, frame):
-        """Create content for the notification shortcut frame."""
-        image_placeholder = customtkinter.CTkFrame(frame, fg_color="green", height=100, width=100, corner_radius=50)
-        image_placeholder.grid(row=0, rowspan=2, column=0, padx=15, pady=10, sticky='w')
-
-        notice_label = customtkinter.CTkLabel(frame, text="Notification", font=('Arial', 18, 'bold'), text_color="black")
-        notice_label.grid(row=0, column=1, padx=5, pady=(15,0), sticky='w')
-
-        notice_content = customtkinter.CTkLabel(frame, 
-            text="Your electricity bill is due on 20th of this month. Please pay it on time.",
-             font=('Arial', 14), wraplength=200, justify='left', text_color='#8e8e8e')
-
-        notice_content.grid(row=1, column=1, padx=(5,10), sticky='nw')
 
 
 #APPLIANCE PAGE ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
@@ -863,6 +836,8 @@ class App(customtkinter.CTk):
                 # Add to appliance list
                 self.appliances.append(new_appliance)
                 
+                new_appliance.save_to_file("appliances.txt")
+
                 # Refresh the appliance list display
                 self.refresh_appliance_list()
                 
@@ -976,7 +951,6 @@ class App(customtkinter.CTk):
                 command=lambda a=appliance: self.create_schedule_dialog(a)
             )
             schedule_btn.pack(side='right', padx=5)
-
             # Power button
             power_btn = customtkinter.CTkButton(
                 btn_frame,
@@ -1052,6 +1026,7 @@ class App(customtkinter.CTk):
                 self.appliances.remove(appliance)
                 self.refresh_appliance_list()
                 self.create_appliance_controls_content(self.appliance_control_frame)
+                self.update_appliance_file()
             dialog.destroy()
 
         def cancel_delete():
@@ -1111,12 +1086,19 @@ class App(customtkinter.CTk):
             appliance.unit = unit_var.get()
             self.refresh_appliance_list()
             self.create_appliance_controls_content(self.appliance_control_frame)
+            # Update the appliance file
+            self.update_appliance_file()
             dialog.destroy()
 
         # Save Button
         save_btn = customtkinter.CTkButton(dialog, text="Save Changes", command=save_changes)
         save_btn.pack(pady=20)
 
+    def update_appliance_file(self):
+        """Update the appliance file with the current list of appliances."""
+        with open("appliances.txt", 'w') as file:
+            for appliance in self.appliances:
+                file.write(f"{appliance.name},{appliance.wattage},{appliance.unit},{appliance.schedule_start},{appliance.schedule_end},{appliance.state}\n")
     def create_schedule_dialog(self, appliance):
         dialog = customtkinter.CTkToplevel(self)
         dialog.title(f"Schedule {appliance.name}")
@@ -1186,6 +1168,7 @@ class App(customtkinter.CTk):
 #NOTIFICATION PAGE ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
     def create_notification_tab(self, frame):
         """Create content for the Notification tab."""
+        self.notifications_list = []
         notification_label = customtkinter.CTkLabel(frame, text="NOTIFICATION", text_color='black', font=('Helvetica', 24))
         notification_label.pack(padx=20, pady=(15, 0), anchor='nw')
         
@@ -1211,14 +1194,253 @@ class App(customtkinter.CTk):
         filter_by_combobox = customtkinter.CTkComboBox(notifications_frame, state="readonly", values=["All", "Unread", "Read"], font=('Helvetica', 12))
         filter_by_combobox.grid(row=0, column=3, padx=(0,20), pady=(20,0), sticky='e')
         
-        notifications_2frame = customtkinter.CTkScrollableFrame(notifications_frame, fg_color="white", width=760, height=540, corner_radius=15)
-        notifications_2frame.grid(row=1, column=0, columnspan=4, padx=15, pady=(25,15), sticky='nsew')
+        self.notifications_2frame = customtkinter.CTkScrollableFrame(notifications_frame, fg_color="white", width=760, height=540, corner_radius=15)
+        self.notifications_2frame.grid(row=1, column=0, columnspan=4, padx=15, pady=(25,15), sticky='nsew')
+        self.check_goal_notifications()
 
-        # Add hardcoded notifications
-        for i in range(5):
-            notification = customtkinter.CTkLabel(notifications_2frame, text=f"Notification {i+1}", text_color='black', font=('Helvetica', 12))
-            notification.pack(pady=5, anchor='nw')
+    def check_goal_notifications(self):
+        """Create notifications based on goal progress"""
+        if self.monthly_goal is not None:
+            percentage = (self.monthly_accumulated_cost / self.monthly_goal) * 100
+            
+            for widget in self.notifications_2frame.winfo_children():
+                widget.destroy()
+                
+            # Create card-style notification
+            def create_notification_card(message, urgency_color):
+                card = customtkinter.CTkFrame(
+                    self.notifications_2frame,
+                    fg_color="white",
+                    corner_radius=10,
+                    border_width=2,
+                    border_color=urgency_color
+                )
+                card.pack(fill='x', padx=10, pady=5)
+                
+                notification = customtkinter.CTkLabel(
+                    card,
+                    text=message,
+                    text_color='black',
+                    font=('Helvetica', 12),
+                    wraplength=600
+                )
+                notification.pack(pady=10, padx=10)
+                
+            if percentage >= 100:
+                create_notification_card(
+                    "⚠️ Alert: Monthly goal exceeded! Current usage: {:.2f} PHP".format(self.monthly_accumulated_cost),
+                    "#ff0000"  # Red for exceeded
+                )
+            elif percentage >= 75:
+                create_notification_card(
+                    "⚠️ Warning: Approaching monthly goal! Usage at 75%",
+                    "#ffa500"  # Orange for warning
+                )
+            elif percentage >= 50:
+                create_notification_card(
+                    "ℹ️ Notice: Usage reached 50% of monthly goal",
+                    "#ffff00"  # Yellow for notice
+                )
 
+            # Update notifications every minute
+            self.after(60000, self.check_goal_notifications)
+
+
+#SETTINGS PAGE -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def create_settings_tab(self, frame):
+        settings_label = customtkinter.CTkLabel(frame, text="SETTINGS", text_color='black', font=('Helvetica', 24))
+        settings_label.pack(padx=20, pady=(15, 0), anchor='nw')
+
+        """Create main card container"""
+        settings_card = customtkinter.CTkFrame(
+            frame,
+            fg_color="white",
+            corner_radius=20,
+            border_width=1,
+            border_color='#b2b2b2'
+        )
+
+        settings_card.pack(fill='both', expand=True, padx=30, pady=15)
+
+        """Create content frame inside card - houses the control panel and appliance list"""
+        content_frame = customtkinter.CTkFrame(settings_card, fg_color='transparent')
+        content_frame.pack(fill='both', expand=True, padx=20, pady=20)
+
+        # Create a frame to hold the inner frame and the buttons (for centering)
+        parent_frame = customtkinter.CTkFrame(
+            content_frame,
+            fg_color='transparent',
+            width=600,  # Set the width of the parent frame
+            height=400,  # Set the height of the parent frame
+        )
+        parent_frame.pack(side='top', anchor='center', expand=True)  # Center the parent frame in content_frame
+
+        # Create a frame to hold the buttons on the right side
+        button_frame = customtkinter.CTkFrame(
+            parent_frame,
+            fg_color='transparent',  # Make the frame background invisible
+            width=200,
+            height=400  # Height to space out the buttons
+        )
+        button_frame.pack(side='right', anchor='center', padx=10, pady=10)  # Position buttons on the right
+
+        # Add rectangle buttons stacked on top of each other in the button frame
+        change_password_button = customtkinter.CTkButton(
+            button_frame,
+            text="Change Password",
+            width=200,
+            height=50,
+            corner_radius=10
+        )
+        change_password_button.pack(pady=(10, 5))  # Spacing between buttons
+
+        # Function to show custom dialog
+        def show_privacy_policy_custom():
+            # Create a new top-level window
+            dialog = customtkinter.CTkToplevel()
+            dialog.title("Privacy Policy")
+            dialog.geometry("400x200")  # Set the size of the dialog
+            dialog.transient(self)
+            dialog.focus_set()
+            dialog.grab_set()
+            dialog.lift()
+            
+            # Add a label to the dialog
+            label = customtkinter.CTkLabel(dialog, text="Here is the Privacy Policy details...", font=("Helvetica", 16))
+            label.pack(padx=20, pady=20)
+
+            # Add a button to close the dialog
+            close_button = customtkinter.CTkButton(dialog, text="Close", command=dialog.destroy)
+            close_button.pack(pady=10)
+
+        # Privacy Policy button with custom dialog
+        privacy_policy_button = customtkinter.CTkButton(
+            button_frame,
+            text="Privacy Policy",
+            width=200,
+            height=50,
+            corner_radius=10,
+            command=show_privacy_policy_custom  # Show the custom dialog when clicked
+        )
+        privacy_policy_button.pack(pady=5)
+
+        # Function to show custom Contact Us dialog
+        def show_contact_us():
+            # Create a new top-level window
+            dialog = customtkinter.CTkToplevel()
+            dialog.title("Contact Us")
+            dialog.geometry("400x300")  # Set the size of the dialog
+            dialog.transient(self)
+            dialog.focus_set()
+            dialog.grab_set()
+            dialog.lift()
+            
+            # Add a label to the dialog
+            label = customtkinter.CTkLabel(dialog, text="If you have any questions, feel free to contact us.", font=("Helvetica", 14))
+            label.pack(padx=20, pady=10)
+            
+            # Add a Textbox for contact message
+            message_label = customtkinter.CTkLabel(dialog, text="Your Message:", font=("Helvetica", 12))
+            message_label.pack(padx=20, pady=10, anchor="w")
+            
+            message_entry = customtkinter.CTkEntry(dialog, width=300)
+            message_entry.pack(padx=20, pady=5)
+            
+            # Add a Send button
+            send_button = customtkinter.CTkButton(dialog, text="Send Message", command=dialog.destroy)
+            send_button.pack(pady=10)
+            
+            # Add a Close button
+            close_button = customtkinter.CTkButton(dialog, text="Close", command=dialog.destroy)
+            close_button.pack(pady=5)
+
+        # Contact Us button with custom dialog
+        contact_us_button = customtkinter.CTkButton(
+            button_frame,
+            text="Contact Us",
+            width=200,
+            height=50,
+            corner_radius=10,
+            command=show_contact_us  # Show the custom dialog when clicked
+        )
+        contact_us_button.pack(pady=5)
+
+        # Function to show custom User Management dialog
+        def show_user_management():
+            # Create a new top-level window
+            dialog = customtkinter.CTkToplevel()
+            dialog.title("User Management")
+            dialog.geometry("400x400")  # Set the size of the dialog
+            dialog.transient(self)
+            dialog.focus_set()
+            dialog.grab_set()
+            dialog.lift()
+            
+            # Add a label to the dialog
+            label = customtkinter.CTkLabel(dialog, text="Manage your users here.", font=("Helvetica", 14))
+            label.pack(padx=20, pady=10)
+            
+            # Add a Textbox for user name
+            user_label = customtkinter.CTkLabel(dialog, text="Username:", font=("Helvetica", 12))
+            user_label.pack(padx=20, pady=10, anchor="w")
+            
+            user_entry = customtkinter.CTkEntry(dialog, width=300)
+            user_entry.pack(padx=20, pady=5)
+            
+            # Add a Textbox for email
+            email_label = customtkinter.CTkLabel(dialog, text="Email address:", font=("Helvetica", 12))
+            email_label.pack(padx=20, pady=10, anchor="w")
+            
+            email_entry = customtkinter.CTkEntry(dialog, width=300)
+            email_entry.pack(padx=20, pady=5)
+
+            # Add a Textbox for contact
+            contact_label = customtkinter.CTkLabel(dialog, text="Contact number:", font=("Helvetica", 12))
+            contact_label.pack(padx=20, pady=10, anchor="w")
+            
+            contact_entry = customtkinter.CTkEntry(dialog, width=300)
+            contact_entry.pack(padx=20, pady=5)
+            
+            # Add a Save button
+            save_button = customtkinter.CTkButton(dialog, text="Save User", command=dialog.destroy)
+            save_button.pack(pady=10)
+            
+            # Add a Close button
+            close_button = customtkinter.CTkButton(dialog, text="Close", command=dialog.destroy)
+            close_button.pack(pady=5)
+
+        # User Management button with custom dialog
+        user_management_button = customtkinter.CTkButton(
+            button_frame,
+            text="User Management",
+            width=200,
+            height=50,
+            corner_radius=10,
+            command=show_user_management  # Show the custom dialog when clicked
+        )
+        user_management_button.pack(pady=5)
+
+        """Create smaller inner frame within the content frame"""
+        inner_frame = customtkinter.CTkFrame(
+            parent_frame,
+            fg_color="#d9d9d9",  # Light gray background for visibility
+            width=250,           # Width smaller than the content_frame
+            height=300,          # Height smaller than the content_frame
+            corner_radius=15
+        )
+        inner_frame.pack(side='left', anchor='center', padx=10, pady=10)  # Align to the left of the parent frame
+        inner_frame.pack_propagate(False)
+
+        # Add labels and text box inside the inner frame
+        name = customtkinter.CTkLabel(inner_frame, text="Name:", text_color='black', font=('Helvetica', 16))
+        name.pack(padx=10, pady=(10, 5), anchor='nw')
+
+        email = customtkinter.CTkLabel(inner_frame, text="Email address:", text_color='black', font=('Helvetica', 16))
+        email.pack(padx=10, pady=(5, 10), anchor='nw')
+
+        contact = customtkinter.CTkLabel(inner_frame, text="Contact address:", text_color='black', font=('Helvetica', 16))
+        contact.pack(padx=10, pady=(5, 10), anchor='nw')
+        
 
     def show_tab(self, index):
         """Display the content of the selected tab."""
@@ -1234,6 +1456,10 @@ class App(customtkinter.CTk):
         self.main_content.grid_columnconfigure(0, weight=1)
 
         self.update_idletasks()
+
+    def logout(self):
+        self.destroy()  # Close the current window
+        subprocess.run(["python", "Final_Product.py"])
 
 if __name__ == "__main__":
     app = App()
